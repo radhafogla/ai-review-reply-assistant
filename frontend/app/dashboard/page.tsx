@@ -35,16 +35,6 @@ export default function Dashboard() {
             return
         }
 
-        // First, sync reviews from Google Business
-        await fetch("/api/sync-reviews", {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${accessToken}`,
-                "Content-Type": "application/json"
-            }
-        })
-
-        // Then fetch the reviews
         const res = await fetch("/api/get-reviews", {
             method: "POST",
             headers: {
