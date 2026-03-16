@@ -1,0 +1,26 @@
+// app/api/connect-google-business/route.ts
+
+import { NextResponse } from "next/server"
+
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url)
+  const userId = searchParams.get("userId")
+
+  const clientId = process.env.GOOGLE_CLIENT_ID
+  const redirectUri = `${process.env.LOCALAUTH_URL}/api/google-callback`
+
+  const scope = [
+    "https://www.googleapis.com/auth/business.manage",
+  ].join(" ")
+
+  const url =
+    `https://accounts.google.com/o/oauth2/v2/auth` +
+    `?client_id=${clientId}` +
+    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+    `&response_type=code` +
+    `&scope=${encodeURIComponent(scope)}` +
+    `&access_type=offline` +
+    `&state=${userId}`
+
+  return NextResponse.redirect(url)
+}
