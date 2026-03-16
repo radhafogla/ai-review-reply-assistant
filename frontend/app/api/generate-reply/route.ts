@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import OpenAI from "openai";
 import { createServerClient } from "@/lib/supabaseServerClient";
 
@@ -6,8 +7,15 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export async function POST(req: Request) {
-  const supabase = await createServerClient();
+export async function POST(req: NextRequest) {
+  const authHeader = req.headers.get("Authorization") || ""
+  const token = authHeader.replace("Bearer ", "")
+
+  if (!token) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const supabase = await createServerClient(token);
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -47,7 +55,7 @@ Write a professional and friendly reply under 80 words.
 
     const reply = completion.choices[0].message.content;
 
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("review_replies")
       .insert({
         review_id: reviewId,

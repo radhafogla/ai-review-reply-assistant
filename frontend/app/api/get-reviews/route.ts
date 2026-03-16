@@ -1,18 +1,35 @@
 import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
 import { createServerClient } from "@/lib/supabaseServerClient"
 
-export async function POST() {
-  const supabase = await createServerClient()
+export async function POST(req: NextRequest) {
+  const authHeader = req.headers.get("Authorization") || ""
+  const token = authHeader.replace("Bearer ", "")
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!token) {
+    console.error("get-reviews: no token in Authorization header")
     return NextResponse.json(
       { error: "Unauthorized", reviews: null },
       { status: 401 }
     )
   }
 
+  // Create client with user's token
+  const supabase = await createServerClient(token)
+
+  // Get user info from token
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+
+  if (userError || !user) {
+    return NextResponse.json(
+      { error: "Unauthorized", reviews: null },
+      { status: 401 }
+    )
+  }
+  
   const userId = user.id
 
   const { data: business } = await supabase

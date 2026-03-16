@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { ReviewWithAnalysis } from "../types/review"
 import { useEffect } from "react"
+import { supabase } from "@/lib/supabaseClient"
 
 type Props = {
   review: ReviewWithAnalysis | null
@@ -16,15 +17,30 @@ export default function ReplyPanel({ review, onReplyPosted }: Props) {
   const [saving, setSaving] = useState(false)
   const [posting, setPosting] = useState(false)
   const [isPosted, setIsPosted] = useState(false)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
   
 
+  // Get access token on mount
   useEffect(() => {
-    if (!review) return
+    const getToken = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setAccessToken(session?.access_token ?? null)
+    }
+    getToken()
+  }, [])
+
+  useEffect(() => {
+    if (!review || !accessToken) return
 
     async function loadReply() {
 
       const res = await fetch(
-        `/api/get-latest-reply?reviewId=${review?.id}`
+        `/api/get-latest-reply?reviewId=${review?.id}`,
+        {
+          headers: {
+            "Authorization": `Bearer ${accessToken}`
+          }
+        }
       )
 
       const data = await res.json()
@@ -41,7 +57,7 @@ export default function ReplyPanel({ review, onReplyPosted }: Props) {
 
     loadReply()
 
-  }, [review])
+  }, [review, accessToken])
 
   if (!review) {
     return (
@@ -55,13 +71,14 @@ export default function ReplyPanel({ review, onReplyPosted }: Props) {
 
     setLoading(true)
 
-    if (!review) return;
+    if (!review || !accessToken) return;
 
     try {
 
       const res = await fetch("/api/generate-reply", {
         method: "POST",
         headers: {
+          "Authorization": `Bearer ${accessToken}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
@@ -84,13 +101,14 @@ export default function ReplyPanel({ review, onReplyPosted }: Props) {
 
   async function saveReply() {
 
-    if (!review) return;
+    if (!review || !accessToken) return;
 
     setSaving(true)
     try {
       await fetch("/api/save-reply", {
         method: "POST",
         headers: {
+          "Authorization": `Bearer ${accessToken}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
@@ -108,7 +126,7 @@ export default function ReplyPanel({ review, onReplyPosted }: Props) {
 
   async function saveAndPost() {
 
-    if (!review) return;
+    if (!review || !accessToken) return;
 
     setPosting(true)
 
@@ -117,6 +135,7 @@ export default function ReplyPanel({ review, onReplyPosted }: Props) {
       const res = await fetch("/api/post-reply", {
         method: "POST",
         headers: {
+          "Authorization": `Bearer ${accessToken}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({

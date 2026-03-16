@@ -1,12 +1,19 @@
 // app/api/google-callback/route.ts
 
 import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
 import { getValidAccessToken } from "@/lib/googleAuth"
 import { createServerClient } from "@/lib/supabaseServerClient"
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authHeader = req.headers.get("Authorization") || ""
+  const token = authHeader.replace("Bearer ", "")
 
-  const supabase = await createServerClient()
+  if (!token) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const supabase = await createServerClient(token)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {

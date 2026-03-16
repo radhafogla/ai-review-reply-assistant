@@ -28,27 +28,24 @@ export default function Dashboard() {
             await supabase.auth.getSession()
 
         const userId = session?.user?.id
+        const accessToken = session?.access_token
 
-        if (!userId) {
+        if (!userId || !accessToken) {
             setHasBusiness(false)
             return
         }
 
-        await fetch("/api/sync-reviews", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            }
-        })
-
         const res = await fetch("/api/get-reviews", {
             method: "POST",
             headers: {
+                "Authorization": `Bearer ${accessToken}`,
                 "Content-Type": "application/json"
-            }
+            },
         })
 
         const data = await res.json()
+
+        console.log("Dashboard: fetched reviews", { data })
 
         if (!data.reviews) {
             setHasBusiness(false)

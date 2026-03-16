@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
 import OpenAI from "openai"
 import { createServerClient } from "@/lib/supabaseServerClient"
 
@@ -6,9 +7,15 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 })
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const authHeader = req.headers.get("Authorization") || ""
+  const token = authHeader.replace("Bearer ", "")
 
-  const supabase = await createServerClient()
+  if (!token) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const supabase = await createServerClient(token)
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {

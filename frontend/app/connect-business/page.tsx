@@ -11,6 +11,7 @@ export default function ConnectBusiness() {
   const [loading, setLoading] = useState(false)
   const [connected, setConnected] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
   const [checkingSession, setCheckingSession] = useState(true)
 
   // -------------------------
@@ -21,6 +22,7 @@ export default function ConnectBusiness() {
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
         setUserId(session.user.id)
+        setAccessToken(session.access_token ?? null)
       }
       setCheckingSession(false)
     }
@@ -39,10 +41,14 @@ export default function ConnectBusiness() {
   // -------------------------
   useEffect(() => {
     async function fetchLocations() {
-      if (!userId) return
+      if (!userId || !accessToken) return
       setLoading(true)
       try {
-        const res = await fetch(`/api/google-locations?userId=${userId}`)
+        const res = await fetch(`/api/google-locations`, {
+          headers: {
+            "Authorization": `Bearer ${accessToken}`
+          }
+        })
         if (res.ok) {
           const data = await res.json()
           if (data.locations && data.locations.length > 0) {
@@ -57,7 +63,7 @@ export default function ConnectBusiness() {
       }
     }
     fetchLocations()
-  }, [userId])
+  }, [userId, accessToken])
 
   // -------------------------
   // 3️⃣ Handle Supabase OAuth connect
@@ -70,14 +76,17 @@ export default function ConnectBusiness() {
   // 4️⃣ Handle selecting a location
   // -------------------------
   async function handleSelect(location: Location) {
-    if (!userId) return
+    if (!userId || !accessToken) return
     setLoading(true)
     try {
       const res = await fetch("/api/save-business", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
-          user_id: userId,
+          account_id: userId,
           location_id: location.locationId,
           name: location.name,
         }),
