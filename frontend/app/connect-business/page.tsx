@@ -23,6 +23,15 @@ export default function ConnectBusiness() {
       if (session?.user) {
         setUserId(session.user.id)
         setAccessToken(session.access_token ?? null)
+
+        // Ensure user profile row exists/updates in public users table.
+        await fetch("/api/ensure-user", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${session.access_token}`,
+            "Content-Type": "application/json"
+          }
+        })
       }
       setCheckingSession(false)
     }

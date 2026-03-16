@@ -35,6 +35,14 @@ export default function Dashboard() {
             return
         }
 
+        await fetch("/api/ensure-user", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${accessToken}`,
+                "Content-Type": "application/json"
+            }
+        })
+
         const res = await fetch("/api/get-reviews", {
             method: "POST",
             headers: {
