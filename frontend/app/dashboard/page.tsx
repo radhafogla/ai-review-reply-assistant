@@ -12,7 +12,7 @@ export default function Dashboard() {
 
   const [reviews, setReviews] = useState<ReviewWithAnalysis[]>([])
   const [hasBusiness, setHasBusiness] = useState(true)
-  const [businesses, setBusinesses] = useState<Array<{ id: string; name: string | null; location_id: string | null }>>([])
+  const [businesses, setBusinesses] = useState<Array<{ id: string; name: string | null }>>([])
   const [selectedBusinessId, setSelectedBusinessId] = useState<string>("")
   const [loading, setLoading] = useState(false)
 
@@ -111,7 +111,6 @@ export default function Dashboard() {
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc" }}>
       <div style={{ maxWidth: 1680, margin: "0 auto", padding: "32px 24px 40px" }}>
-
         {/* ── HEADER CARD ─────────────────────────────────────────────────── */}
         <section style={{
           marginBottom: 24, borderRadius: 20, overflow: "hidden",

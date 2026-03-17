@@ -34,6 +34,7 @@ export default function Navbar() {
     if (!isAuthenticated) return
 
     router.prefetch("/dashboard")
+    router.prefetch("/dashboard/analytics")
     router.prefetch("/connect-business")
   }, [isAuthenticated, router])
 
@@ -115,6 +116,13 @@ export default function Navbar() {
                 className={getNavLinkClass(pathname === "/dashboard")}
               >
                 Dashboard
+              </Link>
+
+              <Link
+                href="/dashboard/analytics"
+                className={getNavLinkClass(pathname === "/dashboard/analytics")}
+              >
+                Analytics
               </Link>
 
               <Link
