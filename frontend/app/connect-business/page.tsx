@@ -1,8 +1,11 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { supabase } from "../../lib/supabaseClient"
+import { useSubscription } from "@/app/hooks/useSubscription"
+import { hasFeature } from "@/lib/subscription"
 import { Location } from "../types/location"
 
 type ConnectedBusiness = {
@@ -16,6 +19,7 @@ type ConnectedBusiness = {
 
 export default function ConnectBusiness() {
   const router = useRouter()
+  const { loading: subscriptionLoading, subscription } = useSubscription()
   const [checkingSession, setCheckingSession] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
   const [accessToken, setAccessToken] = useState<string | null>(null)
@@ -127,12 +131,16 @@ export default function ConnectBusiness() {
     return locations.filter((loc) => !existingKeys.has(loc.locationId))
   }, [locations, connectedBusinesses])
 
+  const canUseMultiBusiness = hasFeature(subscription.plan, "multiBusiness")
+  const hasReachedPlanLimit = !canUseMultiBusiness && connectedBusinesses.length >= 1
+
   function handleConnectGoogle() {
     if (!userId) return
     router.push(`/api/connect-google-business?userId=${userId}`)
   }
 
   async function handleAddAnotherClick() {
+    if (hasReachedPlanLimit) return
     setShowAddPanel(true)
     await fetchLocations()
   }
@@ -240,21 +248,36 @@ export default function ConnectBusiness() {
                 <button
                   type="button"
                   onClick={handleAddAnotherClick}
+                  disabled={hasReachedPlanLimit || subscriptionLoading}
                   style={{
                     padding: "8px 14px",
                     borderRadius: 10,
-                    border: "1px solid #94a3b8",
-                    backgroundColor: "#f8fafc",
-                    color: "#1e293b",
+                    border: `1px solid ${hasReachedPlanLimit || subscriptionLoading ? "#cbd5e1" : "#94a3b8"}`,
+                    backgroundColor: hasReachedPlanLimit || subscriptionLoading ? "#e2e8f0" : "#f8fafc",
+                    color: hasReachedPlanLimit || subscriptionLoading ? "#94a3b8" : "#1e293b",
                     fontWeight: 700,
                     fontSize: 13,
-                    cursor: "pointer",
+                    cursor: hasReachedPlanLimit || subscriptionLoading ? "not-allowed" : "pointer",
                   }}
                 >
                   Add another business
                 </button>
               </div>
             </div>
+
+            {hasReachedPlanLimit && (
+              <div style={{ marginTop: 12, borderRadius: 10, border: "1px solid #bfdbfe", backgroundColor: "#eff6ff", padding: "10px 12px" }}>
+                <p style={{ margin: 0, fontSize: 13, color: "#1e3a8a", fontWeight: 600 }}>
+                  Free and Basic plans support one connected business. Upgrade to Premium for multi-business management.
+                </p>
+                <Link
+                  href="/subscriptions"
+                  style={{ marginTop: 8, display: "inline-flex", fontSize: 12, fontWeight: 700, color: "#1d4ed8", textDecoration: "none" }}
+                >
+                  Go to Subscriptions
+                </Link>
+              </div>
+            )}
           </div>
         </section>
 

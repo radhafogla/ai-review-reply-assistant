@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { createServerClient } from "@/lib/supabaseServerClient"
+import { createServerClient, createServiceClient } from "@/lib/supabaseServerClient"
 import { getValidAccessToken } from "@/lib/googleAuth"
 import { GoogleReview, GoogleReviewListResponse } from "@/app/types/googleReview"
+import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
+import { trackUsageEvent } from "@/lib/usageTracking"
 
 interface StoredReview {
   review_id: string
@@ -142,6 +144,8 @@ async function fetchGoogleReviews(
 }
 
 export async function POST(req: NextRequest) {
+  const endpoint = "/api/sync-reviews"
+  const requestId = createRequestId()
   const authHeader = req.headers.get("Authorization") || ""
   const token = authHeader.replace("Bearer ", "")
 
@@ -161,6 +165,7 @@ export async function POST(req: NextRequest) {
   }
 
   const userId = user.id
+  logApiRequest({ requestId, endpoint, userId })
 
   const { data: business, error: businessError } = await supabase
     .from("businesses")
@@ -181,7 +186,14 @@ export async function POST(req: NextRequest) {
     .eq("business_id", business.id)
 
   if (existingReviewsError) {
-    console.error(existingReviewsError)
+    logApiError({
+      requestId,
+      endpoint,
+      userId,
+      status: 500,
+      message: "Failed to load existing reviews",
+      error: existingReviewsError,
+    })
 
     return NextResponse.json(
       { error: "Failed to load existing reviews" },
@@ -222,14 +234,23 @@ export async function POST(req: NextRequest) {
     )
 
     if (reviewsToUpsert.length > 0) {
-      const { error: insertError } = await supabase
+      const serviceSupabase = createServiceClient()
+      const { error: insertError } = await serviceSupabase
         .from("reviews")
         .upsert(reviewsToUpsert, {
           onConflict: "review_id"
         })
 
       if (insertError) {
-        console.error(insertError)
+        logApiError({
+          requestId,
+          endpoint,
+          userId,
+          status: 500,
+          message: "Failed to upsert synced reviews",
+          error: insertError,
+          businessId: business.id,
+        })
 
         return NextResponse.json(
           { error: "Failed to save reviews" },
@@ -237,6 +258,20 @@ export async function POST(req: NextRequest) {
         )
       }
     }
+
+    await trackUsageEvent({
+      requestId,
+      endpoint,
+      eventType: "reviews_synced",
+      userId,
+      businessId: business.id,
+      metadata: {
+        fetchedCount: dedupedReviews.length,
+        upsertedCount: reviewsToUpsert.length,
+        skippedCount: formattedReviews.length - reviewsToUpsert.length,
+        syncMode: latestKnownTimestamp > 0 ? "incremental" : "initial",
+      },
+    })
 
     return NextResponse.json({
       success: true,
@@ -246,7 +281,15 @@ export async function POST(req: NextRequest) {
       syncMode: latestKnownTimestamp > 0 ? "incremental" : "initial"
     })
   } catch (error) {
-    console.error(error)
+    logApiError({
+      requestId,
+      endpoint,
+      userId,
+      status: 500,
+      message: "Failed to sync Google reviews",
+      error,
+      businessId: business.id,
+    })
 
     return NextResponse.json(
       { error: "Failed to sync Google reviews" },

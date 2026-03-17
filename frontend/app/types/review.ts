@@ -16,7 +16,7 @@ export interface ReviewReply {
   review_id: string
   reply_text: string
   source: "ai" | "user" | "system"
-  status: "draft" | "approved" | "posted" | "failed"
+  status: "draft" | "approved" | "posted" | "failed" | "deleted"
   created_at: string
 }
 

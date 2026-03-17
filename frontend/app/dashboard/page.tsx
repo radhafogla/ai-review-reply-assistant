@@ -1,7 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import Link from "next/link"
 import { supabase } from "@/lib/supabaseClient"
+import { useSubscription } from "@/app/hooks/useSubscription"
+import { hasFeature } from "@/lib/subscription"
 
 import ReviewList from "../components/ReviewList"
 import EmptyState from "../components/EmptyState"
@@ -9,6 +12,7 @@ import EmptyState from "../components/EmptyState"
 import { ReviewWithAnalysis } from "../types/review"
 
 export default function Dashboard() {
+  const { subscription } = useSubscription()
 
   const [reviews, setReviews] = useState<ReviewWithAnalysis[]>([])
   const [hasBusiness, setHasBusiness] = useState(true)
@@ -19,7 +23,7 @@ export default function Dashboard() {
   const reviewsNeedingAttention =
     reviews.filter((review) => {
       const status = review.latest_reply?.status
-      return status === "draft" || status === "failed"
+      return status === "draft" || status === "failed" || status === "deleted"
     }).length
 
   const postedReviews =
@@ -40,6 +44,8 @@ export default function Dashboard() {
     reviews.length > 0
       ? Math.round(((reviews.length - noReplyReviews) / reviews.length) * 100)
       : 0
+
+  const canBulkActions = hasFeature(subscription.plan, "bulkActions")
 
   const loadReviews = useCallback(async (businessId?: string) => {
 
@@ -252,7 +258,40 @@ export default function Dashboard() {
           </div>
         </section>
 
-        <ReviewList reviews={reviews} />
+        {subscription.plan === "free" && subscription.trialExpired && (
+          <div style={{
+            marginTop: 16,
+            borderRadius: 12,
+            border: "1px solid #fecaca",
+            backgroundColor: "#fef2f2",
+            padding: "12px 14px",
+            color: "#991b1b",
+            fontSize: 13,
+            fontWeight: 700,
+          }}>
+            Your Free Trial has ended. Choose Basic or Premium to continue advanced features.
+            <Link href="/subscriptions" style={{ marginLeft: 8, color: "#b91c1c", textDecoration: "underline" }}>
+              View plans
+            </Link>
+          </div>
+        )}
+
+        {!canBulkActions && subscription.plan !== "free" && (
+          <div style={{
+            marginTop: 16,
+            borderRadius: 12,
+            border: "1px solid #bfdbfe",
+            backgroundColor: "#eff6ff",
+            padding: "12px 14px",
+            color: "#1e3a8a",
+            fontSize: 13,
+            fontWeight: 600,
+          }}>
+            Your current plan limits bulk actions. Upgrade in Subscriptions to unlock bulk generate and bulk post.
+          </div>
+        )}
+
+        <ReviewList reviews={reviews} canBulkActions={canBulkActions} />
 
       </div>
     </div>

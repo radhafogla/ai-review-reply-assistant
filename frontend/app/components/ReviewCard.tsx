@@ -6,14 +6,15 @@ import { ReviewWithAnalysis } from "../types/review"
 
 interface Props {
   review: ReviewWithAnalysis
-  mode: "needs-attention" | "posted"
+  mode: "needs-attention" | "posted" | "deleted"
   showCheckbox?: boolean
   isChecked?: boolean
   isExpanded?: boolean
   onToggleCheck?: (reviewId: string) => void
   onToggleExpand?: (reviewId: string) => void
-  onMarkedPosted: (reviewId: string, replyText: string) => void
-  onReplyChanged?: (reviewId: string, replyText: string, status: "draft" | "posted") => void
+  onMarkedPosted: (reviewId: string, replyText: string, source: "ai" | "user" | "system") => void
+  onMarkedDeleted?: (reviewId: string, replyText: string) => void
+  onReplyChanged?: (reviewId: string, replyText: string, status: "draft" | "posted" | "deleted") => void
 }
 
 function initials(name: string) {
@@ -42,14 +43,23 @@ export default function ReviewCard({
   onToggleCheck,
   onToggleExpand,
   onMarkedPosted,
+  onMarkedDeleted,
   onReplyChanged,
 }: Props) {
+  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [replyText, setReplyText] = useState(review.latest_reply?.reply_text ?? "")
   const [savedText, setSavedText] = useState(review.latest_reply?.reply_text ?? "")
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [posting, setPosting] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [sessionExpiredRedirecting, setSessionExpiredRedirecting] = useState(false)
+
+  useEffect(() => {
+    if (!actionMessage) return
+    const timer = setTimeout(() => setActionMessage(null), 3500)
+    return () => clearTimeout(timer)
+  }, [actionMessage])
 
   async function handleSessionExpired() {
     if (sessionExpiredRedirecting) return
@@ -104,6 +114,10 @@ export default function ReviewCard({
     setSavedText(text)
   }, [review.id, review.latest_reply?.reply_text])
 
+  function showActionMessage(type: "success" | "error", text: string) {
+    setActionMessage({ type, text })
+  }
+
   async function generateReply() {
     const accessToken = await getAccessToken()
     if (!accessToken) {
@@ -125,13 +139,20 @@ export default function ReviewCard({
           errorBody = await res.text()
         }
         console.error("generate-reply failed", { status: res.status, body: errorBody })
+        showActionMessage("error", "Could not generate reply. Please try again.")
         return
       }
+
       const data = await res.json()
+
       if (data?.reply) {
         setReplyText(data.reply)
         onReplyChanged?.(review.id, data.reply, "draft")
+        showActionMessage("success", "Reply generated.")
       }
+    } catch (error) {
+      console.error("generate-reply request failed", error)
+      showActionMessage("error", "Could not generate reply. Please try again.")
     } finally {
       setGenerating(false)
     }
@@ -146,13 +167,30 @@ export default function ReviewCard({
     }
     setSaving(true)
     try {
-      await fetch("/api/save-reply", {
+      const res = await fetch("/api/save-reply", {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
         body: JSON.stringify({ reviewId: review.id, replyText }),
       })
+
+      if (!res.ok) {
+        let errorBody: unknown = null
+        try {
+          errorBody = await res.json()
+        } catch {
+          errorBody = await res.text()
+        }
+        console.error("save-reply failed", { status: res.status, body: errorBody })
+        showActionMessage("error", "Could not save draft. Please try again.")
+        return
+      }
+
       onReplyChanged?.(review.id, replyText, "draft")
       setSavedText(replyText)
+      showActionMessage("success", "Draft saved.")
+    } catch (error) {
+      console.error("save-reply request failed", error)
+      showActionMessage("error", "Could not save draft. Please try again.")
     } finally {
       setSaving(false)
     }
@@ -172,24 +210,91 @@ export default function ReviewCard({
         headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
         body: JSON.stringify({ reviewId: review.id, replyText }),
       })
-      if (!res.ok) throw new Error("Failed to post reply")
-      onMarkedPosted(review.id, replyText)
+
+      if (!res.ok) {
+        let errorBody: unknown = null
+        try {
+          errorBody = await res.json()
+        } catch {
+          errorBody = await res.text()
+        }
+        console.error("post-reply failed", { status: res.status, body: errorBody })
+        showActionMessage("error", "Could not post reply. Please try again.")
+        return
+      }
+
+      const data = await res.json()
+      onMarkedPosted(review.id, replyText, data?.reply?.source ?? "user")
+      showActionMessage("success", "Reply posted successfully.")
+    } catch (error) {
+      console.error("post-reply request failed", error)
+      showActionMessage("error", "Could not post reply. Please try again.")
     } finally {
       setPosting(false)
     }
   }
 
+  async function deletePostedReply() {
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm("This will remove the posted reply from Google Reviews. Do you want to continue?")
+      if (!confirmed) {
+        return
+      }
+    }
+
+    const accessToken = await getAccessToken()
+    if (!accessToken) {
+      console.error("delete-reply aborted: no valid access token")
+      return
+    }
+
+    setDeleting(true)
+    try {
+      const res = await fetch("/api/delete-reply", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ reviewId: review.id }),
+      })
+
+      if (!res.ok) {
+        let errorBody: unknown = null
+        try {
+          errorBody = await res.json()
+        } catch {
+          errorBody = await res.text()
+        }
+        console.error("delete-reply failed", { status: res.status, body: errorBody })
+        return
+      }
+
+      onMarkedDeleted?.(review.id, replyText)
+      onReplyChanged?.(review.id, replyText, "deleted")
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const isNA = mode === "needs-attention"
+  const isDeleted = mode === "deleted"
   const expanded = isExpanded ?? true
   const isDirty = replyText !== savedText
   const genOff  = generating
   const saveOff = saving || !isDirty
   const postOff = posting || !replyText.trim()
 
+  const cardBackground = isDeleted ? "#fff1f2" : isNA ? "#fffbeb" : "#f0fdf4"
+  const cardBorder = isDeleted ? "#fda4af" : isNA ? "#fcd34d" : "#6ee7b7"
+  const dividerBorder = isDeleted ? "#fecdd3" : isNA ? "#fde68a" : "#a7f3d0"
+  const badgeBackground = isDeleted ? "#ffe4e6" : isNA ? "#fef3c7" : "#dcfce7"
+  const badgeBorder = isDeleted ? "#fecdd3" : isNA ? "#fde68a" : "#bbf7d0"
+  const badgeColor = isDeleted ? "#9f1239" : isNA ? "#78350f" : "#14532d"
+  const chevronColor = isDeleted ? "#e11d48" : isNA ? "#b45309" : "#059669"
+  const statusLabel = isDeleted ? "Deleted" : isNA ? "Needs attention" : "Posted"
+
   return (
     <div style={{
-      backgroundColor: isNA ? "#fffbeb" : "#f0fdf4",
-      border: `1.5px solid ${isNA ? "#fcd34d" : "#6ee7b7"}`,
+      backgroundColor: cardBackground,
+      border: `1.5px solid ${cardBorder}`,
       borderRadius: 16,
       boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
       overflow: "hidden",
@@ -234,14 +339,14 @@ export default function ReviewCard({
         >
           <span style={{
             fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99,
-            backgroundColor: isNA ? "#fef3c7" : "#dcfce7",
-            border: `1px solid ${isNA ? "#fde68a" : "#bbf7d0"}`,
-            color: isNA ? "#78350f" : "#14532d",
+            backgroundColor: badgeBackground,
+            border: `1px solid ${badgeBorder}`,
+            color: badgeColor,
             whiteSpace: "nowrap",
           }}>
-            {isNA ? "Needs attention" : "Posted"}
+            {statusLabel}
           </span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: isNA ? "#b45309" : "#059669" }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: chevronColor }}>
             {expanded ? "▲" : "▼"}
           </span>
         </div>
@@ -249,7 +354,7 @@ export default function ReviewCard({
 
       {/* ── collapsible body ─────────────────────────────────────────── */}
       {expanded && (
-        <div style={{ padding: "0 16px 16px", borderTop: `1px solid ${isNA ? "#fde68a" : "#a7f3d0"}` }}>
+        <div style={{ padding: "0 16px 16px", borderTop: `1px solid ${dividerBorder}` }}>
 
           {/* review text */}
           <p style={{
@@ -259,15 +364,19 @@ export default function ReviewCard({
             &ldquo;{review.review_text}&rdquo;
           </p>
 
-          {isNA ? (
+          {isNA || isDeleted ? (
             <>
               {/* action note */}
               <div style={{
                 marginTop: 10, borderRadius: 8, padding: "8px 12px",
                 fontSize: 12, fontWeight: 600,
-                backgroundColor: "#fef9c3", border: "1px solid #fde047", color: "#713f12",
+                backgroundColor: isDeleted ? "#ffe4e6" : "#fef9c3",
+                border: `1px solid ${isDeleted ? "#fecdd3" : "#fde047"}`,
+                color: isDeleted ? "#9f1239" : "#713f12",
               }}>
-                Edit the reply below, then click Save and Post.
+                {isDeleted
+                  ? "This reply was removed from Google. Review it and post again when ready."
+                  : "Edit the reply below, then click Save and Post."}
               </div>
 
               {/* textarea */}
@@ -276,11 +385,10 @@ export default function ReviewCard({
                 value={replyText}
                 onChange={(e) => {
                   setReplyText(e.target.value)
-                  onReplyChanged?.(review.id, e.target.value, "draft")
                 }}
                 style={{
                   marginTop: 10, width: "100%", boxSizing: "border-box", resize: "vertical",
-                  borderRadius: 10, border: "1.5px solid #fcd34d",
+                  borderRadius: 10, border: `1.5px solid ${isDeleted ? "#fda4af" : "#fcd34d"}`,
                   backgroundColor: "#ffffff", padding: "10px 12px",
                   fontSize: 13, color: "#1e293b", outline: "none", fontFamily: "inherit",
                 }}
@@ -289,7 +397,8 @@ export default function ReviewCard({
               {/* buttons row */}
               <div style={{
                 marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8,
-                borderTop: "1px solid #fcd34d", paddingTop: 10,
+                borderTop: `1px solid ${isDeleted ? "#fecdd3" : "#fcd34d"}`,
+                paddingTop: 10,
               }}>
                 <button
                   onClick={generateReply}
@@ -333,16 +442,58 @@ export default function ReviewCard({
                 >
                   {posting ? "Posting\u2026" : "Save and Post"}
                 </button>
+
+                {actionMessage && (
+                  <span
+                    style={{
+                      marginLeft: 4,
+                      borderRadius: 999,
+                      padding: "6px 10px",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      alignSelf: "center",
+                      backgroundColor: actionMessage.type === "success" ? "#dcfce7" : "#fee2e2",
+                      border: `1px solid ${actionMessage.type === "success" ? "#86efac" : "#fca5a5"}`,
+                      color: actionMessage.type === "success" ? "#14532d" : "#991b1b",
+                    }}
+                  >
+                    {actionMessage.text}
+                  </span>
+                )}
               </div>
             </>
           ) : (
-            <div style={{
-              marginTop: 10, borderRadius: 10, padding: "10px 14px",
-              fontSize: 13, lineHeight: 1.7, color: "#1e293b",
-              backgroundColor: "#ffffff", border: "1px solid #a7f3d0",
-            }}>
-              {replyText || <span style={{ color: "#94a3b8" }}>No reply text</span>}
-            </div>
+            <>
+              <div style={{
+                marginTop: 10, borderRadius: 10, padding: "10px 14px",
+                fontSize: 13, lineHeight: 1.7, color: "#1e293b",
+                backgroundColor: "#ffffff", border: "1px solid #a7f3d0",
+              }}>
+                {replyText || <span style={{ color: "#94a3b8" }}>No reply text</span>}
+              </div>
+
+              <div style={{
+                marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8,
+                borderTop: "1px solid #a7f3d0", paddingTop: 10,
+              }}>
+                <button
+                  onClick={deletePostedReply}
+                  disabled={deleting}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: deleting ? "not-allowed" : "pointer",
+                    backgroundColor: deleting ? BTN_OFF.bg : "#dc2626",
+                    border: `1px solid ${deleting ? BTN_OFF.border : "#b91c1c"}`,
+                    color: deleting ? BTN_OFF.text : "#ffffff",
+                  }}
+                >
+                  {deleting ? "Deleting..." : "Delete Post"}
+                </button>
+              </div>
+            </>
           )}
         </div>
       )}

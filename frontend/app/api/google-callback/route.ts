@@ -4,8 +4,11 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { getValidAccessToken } from "@/lib/googleAuth"
 import { createServerClient } from "@/lib/supabaseServerClient"
+import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
 
 export async function GET(req: NextRequest) {
+  const endpoint = "/api/google-callback"
+  const requestId = createRequestId()
   const authHeader = req.headers.get("Authorization") || ""
   const token = authHeader.replace("Bearer ", "")
 
@@ -22,6 +25,7 @@ export async function GET(req: NextRequest) {
       { status: 401 }
     )
   }
+  logApiRequest({ requestId, endpoint, userId: user.id })
 
   try {
 
@@ -78,8 +82,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ locations })
 
   } catch (err) {
-
-    console.error(err)
+    logApiError({
+      requestId,
+      endpoint,
+      userId: user.id,
+      status: 500,
+      message: "Failed to fetch Google callback locations",
+      error: err,
+    })
 
     return NextResponse.json(
       { error: "Failed to fetch locations" },

@@ -42,6 +42,19 @@ CREATE TABLE IF NOT EXISTS "public"."businesses" (
 ALTER TABLE "public"."businesses" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."contact_submissions" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "name" "text" NOT NULL,
+    "email" "text" NOT NULL,
+    "subject" "text" NOT NULL,
+    "message" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."contact_submissions" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."integrations" (
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
     "user_id" "uuid",
@@ -80,8 +93,9 @@ CREATE TABLE IF NOT EXISTS "public"."review_replies" (
     "created_at" timestamp with time zone DEFAULT "now"(),
     "posted_at" timestamp without time zone,
     "posted_to_google" boolean DEFAULT false,
+    "user_id" "uuid",
     CONSTRAINT "review_replies_source_check" CHECK (("source" = ANY (ARRAY['ai'::"text", 'user'::"text", 'system'::"text"]))),
-    CONSTRAINT "review_replies_status_check" CHECK (("status" = ANY (ARRAY['draft'::"text", 'approved'::"text", 'posted'::"text", 'failed'::"text"])))
+    CONSTRAINT "review_replies_status_check" CHECK (("status" = ANY (ARRAY['draft'::"text", 'approved'::"text", 'posted'::"text", 'failed'::"text", 'deleted'::"text"])))
 );
 
 
@@ -117,6 +131,21 @@ CREATE TABLE IF NOT EXISTS "public"."subscriptions" (
 ALTER TABLE "public"."subscriptions" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."usage_events" (
+    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
+    "user_id" "uuid",
+    "event_type" "text" NOT NULL,
+    "endpoint" "text",
+    "business_id" "uuid",
+    "review_id" "uuid",
+    "occurred_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "metadata" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL
+);
+
+
+ALTER TABLE "public"."usage_events" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."users" (
     "id" "uuid" NOT NULL,
     "email" "text" NOT NULL,
@@ -135,6 +164,11 @@ ALTER TABLE "public"."users" OWNER TO "postgres";
 
 ALTER TABLE ONLY "public"."businesses"
     ADD CONSTRAINT "businesses_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."contact_submissions"
+    ADD CONSTRAINT "contact_submissions_pkey" PRIMARY KEY ("id");
 
 
 
@@ -165,6 +199,11 @@ ALTER TABLE ONLY "public"."reviews"
 
 ALTER TABLE ONLY "public"."subscriptions"
     ADD CONSTRAINT "subscriptions_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."usage_events"
+    ADD CONSTRAINT "usage_events_pkey" PRIMARY KEY ("id");
 
 
 
@@ -203,6 +242,22 @@ CREATE INDEX "idx_reviews_reply" ON "public"."reviews" USING "btree" ("latest_re
 
 
 
+CREATE INDEX "idx_usage_events_business" ON "public"."usage_events" USING "btree" ("business_id");
+
+
+
+CREATE INDEX "idx_usage_events_review" ON "public"."usage_events" USING "btree" ("review_id");
+
+
+
+CREATE INDEX "idx_usage_events_user" ON "public"."usage_events" USING "btree" ("user_id");
+
+
+
+CREATE UNIQUE INDEX "review_ai_unique" ON "public"."review_replies" USING "btree" ("review_id", "source", "status");
+
+
+
 ALTER TABLE ONLY "public"."businesses"
     ADD CONSTRAINT "businesses_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE;
 
@@ -214,12 +269,17 @@ ALTER TABLE ONLY "public"."integrations"
 
 
 ALTER TABLE ONLY "public"."review_analysis"
-    ADD CONSTRAINT "review_analysis_review_id_fkey" FOREIGN KEY ("review_id") REFERENCES "public"."reviews"("id");
+    ADD CONSTRAINT "review_analysis_review_id_fkey" FOREIGN KEY ("review_id") REFERENCES "public"."reviews"("id") ON DELETE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."review_replies"
     ADD CONSTRAINT "review_replies_review_id_fkey" FOREIGN KEY ("review_id") REFERENCES "public"."reviews"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."review_replies"
+    ADD CONSTRAINT "review_replies_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id");
 
 
 
@@ -238,8 +298,42 @@ ALTER TABLE ONLY "public"."subscriptions"
 
 
 
+ALTER TABLE ONLY "public"."usage_events"
+    ADD CONSTRAINT "usage_events_business_id_fkey" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."usage_events"
+    ADD CONSTRAINT "usage_events_review_id_fkey" FOREIGN KEY ("review_id") REFERENCES "public"."reviews"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."usage_events"
+    ADD CONSTRAINT "usage_events_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE SET NULL;
+
+
+
 ALTER TABLE ONLY "public"."users"
     ADD CONSTRAINT "users_auth_fk" FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+CREATE POLICY "Anyone can submit contact form" ON "public"."contact_submissions" FOR INSERT WITH CHECK (true);
+
+
+
+CREATE POLICY "Users access analysis via ownership" ON "public"."review_analysis" FOR SELECT USING ((EXISTS ( SELECT 1
+   FROM ("public"."reviews" "r"
+     JOIN "public"."businesses" "b" ON (("r"."business_id" = "b"."id")))
+  WHERE (("r"."id" = "review_analysis"."review_id") AND ("b"."user_id" = "auth"."uid"())))));
+
+
+
+CREATE POLICY "Users access own integrations" ON "public"."integrations" USING (("auth"."uid"() = "user_id")) WITH CHECK (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Users access own subscriptions" ON "public"."subscriptions" USING (("auth"."uid"() = "user_id")) WITH CHECK (("auth"."uid"() = "user_id"));
 
 
 
@@ -251,6 +345,10 @@ CREATE POLICY "Users can insert replies to their own reviews" ON "public"."revie
    FROM ("public"."reviews" "r"
      JOIN "public"."businesses" "b" ON (("r"."business_id" = "b"."id")))
   WHERE (("r"."id" = "review_replies"."review_id") AND ("b"."user_id" = "auth"."uid"())))));
+
+
+
+CREATE POLICY "Users can manage their businesses" ON "public"."businesses" USING (("auth"."uid"() = "user_id")) WITH CHECK (("auth"."uid"() = "user_id"));
 
 
 
@@ -267,10 +365,43 @@ CREATE POLICY "Users can read their own reviews" ON "public"."reviews" FOR SELEC
 
 
 
+CREATE POLICY "Users can read their own usage events" ON "public"."usage_events" FOR SELECT USING (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Users can read/update themselves" ON "public"."users" USING (("auth"."uid"() = "id")) WITH CHECK (("auth"."uid"() = "id"));
+
+
+
+ALTER TABLE "public"."businesses" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."contact_submissions" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."integrations" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."review_analysis" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."review_replies" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."reviews" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."subscriptions" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "update_ai_drafts" ON "public"."review_replies" FOR UPDATE USING (("auth"."uid"() = "user_id"));
+
+
+
+ALTER TABLE "public"."usage_events" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."users" ENABLE ROW LEVEL SECURITY;
 
 
 GRANT USAGE ON SCHEMA "public" TO "postgres";
@@ -283,6 +414,12 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 GRANT ALL ON TABLE "public"."businesses" TO "anon";
 GRANT ALL ON TABLE "public"."businesses" TO "authenticated";
 GRANT ALL ON TABLE "public"."businesses" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."contact_submissions" TO "anon";
+GRANT ALL ON TABLE "public"."contact_submissions" TO "authenticated";
+GRANT ALL ON TABLE "public"."contact_submissions" TO "service_role";
 
 
 
@@ -313,6 +450,12 @@ GRANT ALL ON TABLE "public"."reviews" TO "service_role";
 GRANT ALL ON TABLE "public"."subscriptions" TO "anon";
 GRANT ALL ON TABLE "public"."subscriptions" TO "authenticated";
 GRANT ALL ON TABLE "public"."subscriptions" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."usage_events" TO "anon";
+GRANT ALL ON TABLE "public"."usage_events" TO "authenticated";
+GRANT ALL ON TABLE "public"."usage_events" TO "service_role";
 
 
 

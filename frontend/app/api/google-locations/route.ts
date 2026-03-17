@@ -5,8 +5,11 @@ import type { NextRequest } from "next/server"
 import { getValidAccessToken } from "@/lib/googleAuth"
 import { createServerClient } from "@/lib/supabaseServerClient"
 import { Location } from "@/app/types/location"
+import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
 
 export async function GET(req: NextRequest) {
+  const endpoint = "/api/google-locations"
+  const requestId = createRequestId()
   const authHeader = req.headers.get("Authorization") || ""
   const token = authHeader.replace("Bearer ", "")
 
@@ -21,6 +24,7 @@ export async function GET(req: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
+  logApiRequest({ requestId, endpoint, userId: user.id })
 
   try {
 
@@ -68,7 +72,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ locations })
 
   } catch (err) {
-    console.error(err)
+    logApiError({
+      requestId,
+      endpoint,
+      userId: user.id,
+      status: 500,
+      message: "Failed to fetch Google locations",
+      error: err,
+    })
     return NextResponse.json({ error: "Failed to fetch locations" }, { status: 500 })
   }
 }

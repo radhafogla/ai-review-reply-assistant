@@ -7,17 +7,30 @@ import { ReviewWithAnalysis } from "../types/review"
 
 type Props = {
   reviews: ReviewWithAnalysis[]
+  canBulkActions?: boolean
 }
 
-export default function ReviewList({ reviews }: Props) {
+export default function ReviewList({ reviews, canBulkActions = true }: Props) {
   const [localReviews, setLocalReviews] = useState<ReviewWithAnalysis[]>(reviews)
   const [isNeedsAttentionOpen, setIsNeedsAttentionOpen] = useState(true)
+  const [isDeletedOpen, setIsDeletedOpen] = useState(true)
   const [isPostedOpen, setIsPostedOpen] = useState(true)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [bulkGenerating, setBulkGenerating] = useState(false)
   const [bulkPosting, setBulkPosting] = useState(false)
+  const [bulkMessage, setBulkMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [sessionExpiredRedirecting, setSessionExpiredRedirecting] = useState(false)
+
+  useEffect(() => {
+    if (!bulkMessage) return
+    const timer = setTimeout(() => setBulkMessage(null), 3500)
+    return () => clearTimeout(timer)
+  }, [bulkMessage])
+
+  function showBulkMessage(type: "success" | "error", text: string) {
+    setBulkMessage({ type, text })
+  }
 
   async function handleSessionExpired() {
     if (sessionExpiredRedirecting) return
@@ -77,7 +90,7 @@ export default function ReviewList({ reviews }: Props) {
 
     if (sentiment === "negative") score += 50
     if (rating <= 2) score += 40
-    if (status === "draft" || status === "failed") score += 30
+    if (status === "draft" || status === "failed" || status === "deleted") score += 30
 
     return score
   }
@@ -99,6 +112,10 @@ export default function ReviewList({ reviews }: Props) {
       const status = review.latest_reply?.status
       return status === "draft" || status === "failed"
     })
+  }, [sortedReviews])
+
+  const deletedReplies = useMemo(() => {
+    return sortedReviews.filter((review) => review.latest_reply?.status === "deleted")
   }, [sortedReviews])
 
   const posted = useMemo(() => {
@@ -123,7 +140,7 @@ export default function ReviewList({ reviews }: Props) {
   // auto-expand newly arriving cards
   useEffect(() => {
     setExpandedIds((prev) => {
-      const newIds = [...needsAttention, ...posted]
+      const newIds = [...needsAttention, ...deletedReplies, ...posted]
         .filter((r) => !prev.has(r.id))
         .map((r) => r.id)
       if (newIds.length === 0) return prev
@@ -131,9 +148,9 @@ export default function ReviewList({ reviews }: Props) {
       newIds.forEach((id) => next.add(id))
       return next
     })
-  }, [needsAttention, posted])
+  }, [needsAttention, deletedReplies, posted])
 
-  function handleMarkedPosted(reviewId: string, replyText: string) {
+  function handleMarkedPosted(reviewId: string, replyText: string, source: "ai" | "user" | "system") {
     setLocalReviews((prev) =>
       prev.map((review) => {
         if (review.id !== reviewId) return review
@@ -147,7 +164,7 @@ export default function ReviewList({ reviews }: Props) {
             id: latestReplyId,
             review_id: review.id,
             reply_text: replyText,
-            source: review.latest_reply?.source ?? "user",
+            source,
             status: "posted",
             created_at: new Date().toISOString()
           }
@@ -164,7 +181,32 @@ export default function ReviewList({ reviews }: Props) {
 
   const memoizedHandleMarkedPosted = useCallback(handleMarkedPosted, [])
 
-  function handleReplyChanged(reviewId: string, replyText: string, status: "draft" | "posted") {
+  function handleMarkedDeleted(reviewId: string, replyText: string) {
+    setLocalReviews((prev) =>
+      prev.map((review) => {
+        if (review.id !== reviewId) return review
+
+        const latestReplyId = review.latest_reply?.id ?? review.latest_reply_id ?? `${reviewId}-local-reply`
+
+        return {
+          ...review,
+          latest_reply_id: latestReplyId,
+          latest_reply: {
+            id: latestReplyId,
+            review_id: review.id,
+            reply_text: replyText,
+            source: review.latest_reply?.source ?? "user",
+            status: "deleted",
+            created_at: new Date().toISOString(),
+          },
+        }
+      }),
+    )
+  }
+
+  const memoizedHandleMarkedDeleted = useCallback(handleMarkedDeleted, [])
+
+  function handleReplyChanged(reviewId: string, replyText: string, status: "draft" | "posted" | "deleted") {
     console.log("handleReplyChanged called:", { reviewId, replyText, status })
     setLocalReviews((prev) =>
       prev.map((review) => {
@@ -253,7 +295,24 @@ export default function ReviewList({ reviews }: Props) {
     })
   }
 
+  function expandAllDeleted() {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      deletedReplies.forEach((r) => next.add(r.id))
+      return next
+    })
+  }
+
+  function collapseAllDeleted() {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      deletedReplies.forEach((r) => next.delete(r.id))
+      return next
+    })
+  }
+
   async function generateForSelected() {
+    if (!canBulkActions) return
     if (selectedIds.size === 0) return
 
     setBulkGenerating(true)
@@ -310,12 +369,27 @@ export default function ReviewList({ reviews }: Props) {
           handleReplyChanged(result.reviewId, result.replyText, "draft")
         }
       })
+
+      const successCount = results.filter((result) => Boolean(result.replyText)).length
+      const failureCount = results.length - successCount
+
+      if (successCount > 0 && failureCount === 0) {
+        showBulkMessage("success", `Generated ${successCount} replies.`)
+      } else if (successCount > 0 && failureCount > 0) {
+        showBulkMessage("error", `Generated ${successCount} replies. ${failureCount} failed.`)
+      } else {
+        showBulkMessage("error", "Could not generate replies. Please try again.")
+      }
+    } catch (error) {
+      console.error("bulk generate failed", error)
+      showBulkMessage("error", "Could not generate replies. Please try again.")
     } finally {
       setBulkGenerating(false)
     }
   }
 
   async function saveAndPostSelected() {
+    if (!canBulkActions) return
     if (selectedIds.size === 0) return
 
     setBulkPosting(true)
@@ -329,10 +403,12 @@ export default function ReviewList({ reviews }: Props) {
 
       const selectedReviews = needsAttention.filter((review) => selectedIds.has(review.id))
 
-      await Promise.all(
+      const results = await Promise.all(
         selectedReviews.map(async (review) => {
           const replyText = (review.latest_reply?.reply_text ?? "").trim()
-          if (!replyText) return
+          if (!replyText) {
+            return { reviewId: review.id, posted: false }
+          }
 
           const res = await fetch("/api/post-reply", {
             method: "POST",
@@ -347,10 +423,35 @@ export default function ReviewList({ reviews }: Props) {
           })
 
           if (res.ok) {
-            handleMarkedPosted(review.id, replyText)
+            const data = await res.json()
+            handleMarkedPosted(review.id, replyText, data?.reply?.source ?? "user")
+            return { reviewId: review.id, posted: true }
           }
+
+          let errorBody: unknown = null
+          try {
+            errorBody = await res.json()
+          } catch {
+            errorBody = await res.text()
+          }
+          console.error("bulk post-reply failed", { reviewId: review.id, status: res.status, body: errorBody })
+          return { reviewId: review.id, posted: false }
         })
       )
+
+      const successCount = results.filter((result) => result.posted).length
+      const failureCount = results.length - successCount
+
+      if (successCount > 0 && failureCount === 0) {
+        showBulkMessage("success", `Posted ${successCount} replies.`)
+      } else if (successCount > 0 && failureCount > 0) {
+        showBulkMessage("error", `Posted ${successCount} replies. ${failureCount} failed.`)
+      } else {
+        showBulkMessage("error", "Could not post replies. Please try again.")
+      }
+    } catch (error) {
+      console.error("bulk post failed", error)
+      showBulkMessage("error", "Could not post replies. Please try again.")
     } finally {
       setBulkPosting(false)
     }
@@ -412,6 +513,37 @@ export default function ReviewList({ reviews }: Props) {
             isExpanded={expandedIds.has(review.id)}
             onToggleExpand={memoizedToggleExpand}
             onMarkedPosted={memoizedHandleMarkedPosted}
+            onMarkedDeleted={memoizedHandleMarkedDeleted}
+          />
+        ))}
+      </div>
+    )
+  }
+
+  function renderDeleted() {
+    if (deletedReplies.length === 0) {
+      return (
+        <div style={{
+          borderRadius: 12, border: "1.5px dashed #fda4af",
+          backgroundColor: "#fff1f2", padding: 32,
+          textAlign: "center", fontSize: 14, color: "#9f1239",
+        }}>
+          No deleted replies.
+        </div>
+      )
+    }
+
+    return (
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+        {deletedReplies.map((review) => (
+          <ReviewCard
+            key={review.id}
+            review={review}
+            mode="deleted"
+            isExpanded={expandedIds.has(review.id)}
+            onToggleExpand={memoizedToggleExpand}
+            onMarkedPosted={memoizedHandleMarkedPosted}
+            onReplyChanged={memoizedHandleReplyChanged}
           />
         ))}
       </div>
@@ -429,6 +561,23 @@ export default function ReviewList({ reviews }: Props) {
 
       {/* ── sections ────────────────────────────────────────────────────── */}
       <div style={{ padding: 24 }}>
+
+        {bulkMessage && (
+          <div
+            style={{
+              marginBottom: 16,
+              borderRadius: 10,
+              padding: "10px 12px",
+              fontSize: 13,
+              fontWeight: 700,
+              backgroundColor: bulkMessage.type === "success" ? "#dcfce7" : "#fee2e2",
+              border: `1px solid ${bulkMessage.type === "success" ? "#86efac" : "#fca5a5"}`,
+              color: bulkMessage.type === "success" ? "#14532d" : "#991b1b",
+            }}
+          >
+            {bulkMessage.text}
+          </div>
+        )}
 
         {/* Needs attention section */}
         <section style={{ marginBottom: 32 }}>
@@ -474,10 +623,13 @@ export default function ReviewList({ reviews }: Props) {
                 <button
                   type="button"
                   onClick={selectAllNeedsAttention}
+                  disabled={!canBulkActions}
                   style={{
                     padding: "7px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
-                    cursor: "pointer", backgroundColor: "#ffffff",
-                    border: "1px solid #f59e0b", color: "#b45309", whiteSpace: "nowrap",
+                    cursor: canBulkActions ? "pointer" : "not-allowed",
+                    backgroundColor: canBulkActions ? "#ffffff" : "#e2e8f0",
+                    border: `1px solid ${canBulkActions ? "#f59e0b" : "#cbd5e1"}`,
+                    color: canBulkActions ? "#b45309" : "#94a3b8", whiteSpace: "nowrap",
                   }}
                 >
                   Select all
@@ -485,10 +637,13 @@ export default function ReviewList({ reviews }: Props) {
                 <button
                   type="button"
                   onClick={clearSelected}
+                  disabled={!canBulkActions}
                   style={{
                     padding: "7px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
-                    cursor: "pointer", backgroundColor: "#ffffff",
-                    border: "1px solid #f59e0b", color: "#b45309", whiteSpace: "nowrap",
+                    cursor: canBulkActions ? "pointer" : "not-allowed",
+                    backgroundColor: canBulkActions ? "#ffffff" : "#e2e8f0",
+                    border: `1px solid ${canBulkActions ? "#f59e0b" : "#cbd5e1"}`,
+                    color: canBulkActions ? "#b45309" : "#94a3b8", whiteSpace: "nowrap",
                   }}
                 >
                   Clear
@@ -496,13 +651,13 @@ export default function ReviewList({ reviews }: Props) {
                 <button
                   type="button"
                   onClick={generateForSelected}
-                  disabled={selectedIds.size === 0 || bulkGenerating}
+                  disabled={!canBulkActions || selectedIds.size === 0 || bulkGenerating}
                   style={{
                     padding: "7px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
-                    cursor: selectedIds.size === 0 || bulkGenerating ? "not-allowed" : "pointer",
-                    backgroundColor: selectedIds.size === 0 || bulkGenerating ? "#e2e8f0" : "#2563eb",
-                    border: `1px solid ${selectedIds.size === 0 || bulkGenerating ? "#cbd5e1" : "#1d4ed8"}`,
-                    color: selectedIds.size === 0 || bulkGenerating ? "#94a3b8" : "#ffffff",
+                    cursor: !canBulkActions || selectedIds.size === 0 || bulkGenerating ? "not-allowed" : "pointer",
+                    backgroundColor: !canBulkActions || selectedIds.size === 0 || bulkGenerating ? "#e2e8f0" : "#2563eb",
+                    border: `1px solid ${!canBulkActions || selectedIds.size === 0 || bulkGenerating ? "#cbd5e1" : "#1d4ed8"}`,
+                    color: !canBulkActions || selectedIds.size === 0 || bulkGenerating ? "#94a3b8" : "#ffffff",
                     whiteSpace: "nowrap",
                   }}
                 >
@@ -511,13 +666,13 @@ export default function ReviewList({ reviews }: Props) {
                 <button
                   type="button"
                   onClick={saveAndPostSelected}
-                  disabled={selectedIds.size === 0 || bulkPosting}
+                  disabled={!canBulkActions || selectedIds.size === 0 || bulkPosting}
                   style={{
                     padding: "7px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
-                    cursor: selectedIds.size === 0 || bulkPosting ? "not-allowed" : "pointer",
-                    backgroundColor: selectedIds.size === 0 || bulkPosting ? "#e2e8f0" : "#059669",
-                    border: `1px solid ${selectedIds.size === 0 || bulkPosting ? "#cbd5e1" : "#047857"}`,
-                    color: selectedIds.size === 0 || bulkPosting ? "#94a3b8" : "#ffffff",
+                    cursor: !canBulkActions || selectedIds.size === 0 || bulkPosting ? "not-allowed" : "pointer",
+                    backgroundColor: !canBulkActions || selectedIds.size === 0 || bulkPosting ? "#e2e8f0" : "#059669",
+                    border: `1px solid ${!canBulkActions || selectedIds.size === 0 || bulkPosting ? "#cbd5e1" : "#047857"}`,
+                    color: !canBulkActions || selectedIds.size === 0 || bulkPosting ? "#94a3b8" : "#ffffff",
                     whiteSpace: "nowrap",
                   }}
                 >
@@ -553,7 +708,7 @@ export default function ReviewList({ reviews }: Props) {
         </section>
 
         {/* Posted section */}
-        <section style={{ borderTop: "2px solid #f1f5f9", paddingTop: 32 }}>
+        <section style={{ borderTop: "2px solid #f1f5f9", paddingTop: 32, marginBottom: 32 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
             <button
               type="button"
@@ -613,6 +768,69 @@ export default function ReviewList({ reviews }: Props) {
           </div>
 
           {isPostedOpen && renderPosted()}
+        </section>
+
+        {/* Deleted section */}
+        <section style={{ borderTop: "2px solid #f1f5f9", paddingTop: 32 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+            <button
+              type="button"
+              onClick={() => setIsDeletedOpen((prev) => !prev)}
+              style={{
+                flex: 1, display: "flex", alignItems: "center",
+                justifyContent: "space-between", padding: "12px 16px",
+                borderRadius: 12, cursor: "pointer", textAlign: "left",
+                backgroundColor: "#fff1f2", border: "2px solid #fb7185",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                  backgroundColor: "#e11d48", display: "flex",
+                  alignItems: "center", justifyContent: "center",
+                  fontSize: 16, fontWeight: 700, color: "#ffffff",
+                }}>
+                  ×
+                </div>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#9f1239" }}>
+                  Deleted from Google ({deletedReplies.length})
+                </span>
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#be123c" }}>
+                {isDeletedOpen ? "▼ Hide" : "▶ Show"}
+              </span>
+            </button>
+
+            {isDeletedOpen && deletedReplies.length > 0 && (
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                <button
+                  type="button"
+                  onClick={expandAllDeleted}
+                  style={{
+                    padding: "7px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
+                    cursor: "pointer", backgroundColor: "#ffffff",
+                    border: "1px solid #fb7185", color: "#9f1239", whiteSpace: "nowrap",
+                  }}
+                >
+                  Expand all
+                </button>
+                <button
+                  type="button"
+                  onClick={collapseAllDeleted}
+                  style={{
+                    padding: "7px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
+                    cursor: "pointer", backgroundColor: "#ffffff",
+                    border: "1px solid #fb7185", color: "#9f1239", whiteSpace: "nowrap",
+                  }}
+                >
+                  Collapse all
+                </button>
+              </div>
+            )}
+          </div>
+
+          {isDeletedOpen && renderDeleted()}
         </section>
       </div>
     </div>

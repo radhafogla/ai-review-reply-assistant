@@ -1,3 +1,5 @@
+import Link from "next/link"
+
 const PrivacyPolicyPage = () => {
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 px-4 py-10 text-slate-800 sm:px-6 lg:px-8">
@@ -60,6 +62,13 @@ const PrivacyPolicyPage = () => {
           <h2 className="text-xl font-semibold text-slate-900">7. Contact Us</h2>
           <p className="leading-7 text-slate-700">
             For privacy-related questions, contact us at privacy@reviewai.com.
+          </p>
+          <p className="text-sm text-slate-600">
+            For product support, billing, or technical help, use our {" "}
+            <Link href="/contact" className="font-semibold text-blue-700 hover:text-blue-800">
+              Contact Us form
+            </Link>
+            .
           </p>
         </section>
       </div>

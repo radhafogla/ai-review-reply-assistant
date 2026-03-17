@@ -1,13 +1,22 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createServerClient } from "@/lib/supabaseServerClient";
+import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger";
 
 export async function POST(req: NextRequest) {
+  const endpoint = "/api/get-reviews";
+  const requestId = createRequestId();
   const authHeader = req.headers.get("Authorization") || "";
   const token = authHeader.replace("Bearer ", "");
 
   if (!token) {
-    console.error("get-reviews: no token in Authorization header");
+    logApiError({
+      requestId,
+      endpoint,
+      status: 401,
+      message: "Missing bearer token",
+      error: "missing_token",
+    });
     return NextResponse.json(
       { error: "Unauthorized", reviews: null },
       { status: 401 },
@@ -31,14 +40,13 @@ export async function POST(req: NextRequest) {
   }
 
   const userId = user.id;
+  logApiRequest({ requestId, endpoint, userId });
 
   const body = await req.json().catch(() => ({}));
   const requestedBusinessId =
     typeof body?.businessId === "string" && body.businessId.trim().length > 0
       ? body.businessId.trim()
       : null;
-
-  console.log("get-reviews: fetching reviews for user", { userId });
 
   const { data: businesses, error: businessesError } = await supabase
     .from("businesses")
@@ -47,7 +55,14 @@ export async function POST(req: NextRequest) {
     .order("id", { ascending: true });
 
   if (businessesError) {
-    console.error("get-reviews: failed loading businesses", { userId, error: businessesError.message });
+    logApiError({
+      requestId,
+      endpoint,
+      userId,
+      status: 500,
+      message: "Failed loading businesses",
+      error: businessesError.message,
+    });
     return NextResponse.json(
       { error: "Failed to load businesses", detail: businessesError.message, reviews: null },
       { status: 500 },
@@ -55,7 +70,13 @@ export async function POST(req: NextRequest) {
   }
 
   if (!businesses || businesses.length === 0) {
-    console.error("get-reviews: no business found for user", { userId });
+    logApiRequest({
+      requestId,
+      endpoint,
+      userId,
+      message: "No businesses connected",
+      businessCount: 0,
+    });
     return NextResponse.json({ reviews: [], businesses: [], selectedBusinessId: null });
   }
 
@@ -64,9 +85,11 @@ export async function POST(req: NextRequest) {
     : businesses[0];
 
   const selectedBusinessId = selectedBusiness.id;
-
-  console.log("get-reviews: found business for user", {
+  logApiRequest({
+    requestId,
+    endpoint,
     userId,
+    message: "Selected business for reviews fetch",
     businessCount: businesses.length,
     selectedBusinessId,
   });
@@ -91,12 +114,23 @@ export async function POST(req: NextRequest) {
     .order("review_date", { ascending: false });
 
   if (error) {
-    console.error("get-reviews error:", error);
+    logApiError({
+      requestId,
+      endpoint,
+      userId,
+      status: 500,
+      message: "Failed fetching reviews",
+      error,
+      selectedBusinessId,
+    });
   }
-  console.log("get-reviews: fetched reviews for user", {
+  logApiRequest({
+    requestId,
+    endpoint,
     userId,
+    message: "Fetched reviews",
     selectedBusinessId,
-    reviewCount: reviews?.length,
+    reviewCount: reviews?.length ?? 0,
   });
 
   return NextResponse.json({ reviews: reviews ?? [], businesses, selectedBusinessId });

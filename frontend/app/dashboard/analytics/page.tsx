@@ -1,7 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { supabase } from "@/lib/supabaseClient"
+import { useSubscription } from "@/app/hooks/useSubscription"
+import { hasFeature } from "@/lib/subscription"
 import EmptyState from "@/app/components/EmptyState"
 
 type Bucket = { label: string; value: number }
@@ -96,6 +99,7 @@ function PieChart({ title, data, palette }: { title: string; data: Bucket[]; pal
 }
 
 export default function AnalyticsPage() {
+  const { loading: subscriptionLoading, subscription } = useSubscription()
   const [hasBusiness, setHasBusiness] = useState(true)
   const [loading, setLoading] = useState(false)
   const [businesses, setBusinesses] = useState<Array<{ id: string; name: string | null }>>([])
@@ -149,11 +153,46 @@ export default function AnalyticsPage() {
   }, [])
 
   useEffect(() => {
+    if (subscriptionLoading || !hasFeature(subscription.plan, "analytics")) return
+
     const run = async () => {
       await loadAnalytics(selectedBusinessId || undefined)
     }
     run()
-  }, [selectedBusinessId, loadAnalytics])
+  }, [selectedBusinessId, loadAnalytics, subscription.plan, subscriptionLoading])
+
+  if (!subscriptionLoading && !hasFeature(subscription.plan, "analytics")) {
+    return (
+      <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc", padding: "32px 24px 40px" }}>
+        <div style={{ maxWidth: 980, margin: "0 auto" }}>
+          <section style={{ borderRadius: 16, border: "1px solid #bfdbfe", backgroundColor: "#eff6ff", padding: 24 }}>
+            <h1 style={{ margin: 0, fontSize: 26, color: "#1e3a8a", fontWeight: 800 }}>Analytics is not available on Free</h1>
+            <p style={{ marginTop: 8, marginBottom: 0, color: "#334155", fontSize: 14, lineHeight: 1.7 }}>
+              Upgrade to Basic or Premium to view analytics charts and performance insights.
+            </p>
+            <Link
+              href="/subscriptions"
+              style={{
+                marginTop: 14,
+                display: "inline-flex",
+                alignItems: "center",
+                borderRadius: 10,
+                border: "1px solid #1d4ed8",
+                backgroundColor: "#2563eb",
+                color: "#fff",
+                padding: "8px 14px",
+                fontSize: 13,
+                fontWeight: 700,
+                textDecoration: "none",
+              }}
+            >
+              View Subscriptions
+            </Link>
+          </section>
+        </div>
+      </div>
+    )
+  }
 
   if (!hasBusiness) return <EmptyState />
 

@@ -1,8 +1,22 @@
 "use client"
 
 import Link from "next/link"
+import { useEffect, useState } from "react"
+import { supabase } from "@/lib/supabaseClient"
 
 export default function Hero() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      setIsLoggedIn(!!session)
+    }
+    checkAuth()
+  }, [])
+
   return (
       <section id="about" className="scroll-mt-24 px-4 py-16 md:py-18">
       <div className="max-w-5xl mx-auto">
@@ -20,14 +34,16 @@ export default function Hero() {
             to strengthen your business reputation.
           </p>
 
-          <div className="flex justify-center">
-            <Link
-              href="/login"
-              className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-6 py-3 text-sm md:text-base font-medium text-white shadow-md transition hover:bg-blue-600"
-            >
-              Get Started for Free
-            </Link>
-          </div>
+          {!isLoggedIn && (
+            <div className="flex justify-center">
+              <Link
+                href="/login"
+                className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-6 py-3 text-sm md:text-base font-medium text-white shadow-md transition hover:bg-blue-600"
+              >
+                Get Started for Free
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </section>

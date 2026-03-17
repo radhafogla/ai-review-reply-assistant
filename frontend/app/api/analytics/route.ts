@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { createServerClient } from "@/lib/supabaseServerClient"
+import { hasFeature, normalizePlan } from "@/lib/subscription"
+import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
 
 type Bucket = { label: string; value: number }
 
@@ -11,10 +13,13 @@ function toBuckets(record: Record<string, number>): Bucket[] {
 }
 
 export async function POST(req: NextRequest) {
+  const endpoint = "/api/analytics"
+  const requestId = createRequestId()
   const authHeader = req.headers.get("Authorization") || ""
   const token = authHeader.replace(/^Bearer\s+/i, "").trim()
 
   if (!token) {
+    logApiError({ requestId, endpoint, status: 401, message: "Missing bearer token", error: "missing_token" })
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -25,9 +30,11 @@ export async function POST(req: NextRequest) {
   } = await supabase.auth.getUser()
 
   if (userError || !user) {
+    logApiError({ requestId, endpoint, status: 401, message: "Invalid or missing user", error: userError?.message ?? "no_user" })
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  logApiRequest({ requestId, endpoint, userId: user.id })
   const body = await req.json().catch(() => ({}))
   const requestedBusinessId = typeof body?.businessId === "string" ? body.businessId : null
 
@@ -38,6 +45,7 @@ export async function POST(req: NextRequest) {
     .order("id", { ascending: true })
 
   if (businessesError) {
+    logApiError({ requestId, endpoint, userId: user.id, status: 500, message: "Failed to load businesses", error: businessesError.message })
     return NextResponse.json({ error: "Failed to load businesses", detail: businessesError.message }, { status: 500 })
   }
 
@@ -49,6 +57,19 @@ export async function POST(req: NextRequest) {
     ? businesses.find((b) => b.id === requestedBusinessId) ?? businesses[0]
     : businesses[0]
 
+  const { data: userRow } = await supabase
+    .from("users")
+    .select("plan")
+    .eq("id", user.id)
+    .maybeSingle()
+
+  const resolvedPlan = normalizePlan(userRow?.plan)
+
+  if (!hasFeature(resolvedPlan, "analytics")) {
+    logApiError({ requestId, endpoint, userId: user.id, status: 403, message: "Plan does not include analytics", error: "plan_gate", plan: resolvedPlan })
+    return NextResponse.json({ error: "Analytics is not included in your current plan" }, { status: 403 })
+  }
+
   const selectedBusinessId = selectedBusiness.id
 
   const { data: reviews, error: reviewsError } = await supabase
@@ -57,6 +78,7 @@ export async function POST(req: NextRequest) {
     .eq("business_id", selectedBusinessId)
 
   if (reviewsError) {
+    logApiError({ requestId, endpoint, userId: user.id, status: 500, message: "Failed to load reviews", error: reviewsError.message })
     return NextResponse.json({ error: "Failed to load reviews", detail: reviewsError.message }, { status: 500 })
   }
 
@@ -70,6 +92,7 @@ export async function POST(req: NextRequest) {
     : { data: [], error: null }
 
   if (repliesError) {
+    logApiError({ requestId, endpoint, userId: user.id, status: 500, message: "Failed to load replies", error: repliesError.message })
     return NextResponse.json({ error: "Failed to load replies", detail: repliesError.message }, { status: 500 })
   }
 
@@ -81,6 +104,7 @@ export async function POST(req: NextRequest) {
     : { data: [], error: null }
 
   if (analysisError) {
+    logApiError({ requestId, endpoint, userId: user.id, status: 500, message: "Failed to load analysis", error: analysisError.message })
     return NextResponse.json({ error: "Failed to load analysis", detail: analysisError.message }, { status: 500 })
   }
 
@@ -104,7 +128,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const statusCount = { draft: 0, approved: 0, posted: 0, failed: 0, none: 0 }
+  const statusCount = { draft: 0, approved: 0, posted: 0, failed: 0, deleted: 0, none: 0 }
   const replyById = new Map((replies ?? []).map((r) => [r.id, r]))
 
   for (const review of reviews ?? []) {
@@ -135,7 +159,7 @@ export async function POST(req: NextRequest) {
       analyses: analyses?.length ?? 0,
       businesses: businesses.length,
       integrations: integrations?.length ?? 0,
-      plan: subscriptions?.[0]?.plan ?? "free",
+      plan: subscriptions?.[0]?.plan ?? resolvedPlan,
       subscriptionStatus: subscriptions?.[0]?.status ?? "active",
     },
     charts: {
