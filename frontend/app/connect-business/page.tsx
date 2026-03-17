@@ -1,177 +1,368 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "../../lib/supabaseClient"
 import { Location } from "../types/location"
 
+type ConnectedBusiness = {
+  id: string
+  name: string | null
+  location_id?: string | null
+  google_location_id?: string | null
+  account_id?: string | null
+  connected_at?: string | null
+}
+
 export default function ConnectBusiness() {
   const router = useRouter()
-  const [locations, setLocations] = useState<Location[]>([])
-  const [loading, setLoading] = useState(false)
-  const [connected, setConnected] = useState(false)
+  const [checkingSession, setCheckingSession] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
   const [accessToken, setAccessToken] = useState<string | null>(null)
-  const [checkingSession, setCheckingSession] = useState(true)
 
-  // -------------------------
-  // 1️⃣ Check Supabase session
-  // -------------------------
-  useEffect(() => {
-    async function fetchUser() {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user) {
-        setUserId(session.user.id)
-        setAccessToken(session.access_token ?? null)
+  const [connectedBusinesses, setConnectedBusinesses] = useState<ConnectedBusiness[]>([])
+  const [locations, setLocations] = useState<Location[]>([])
 
-        // Ensure user profile row exists/updates in public users table.
-        await fetch("/api/ensure-user", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${session.access_token}`,
-            "Content-Type": "application/json"
-          }
-        })
-      }
+  const [loadingBusinesses, setLoadingBusinesses] = useState(false)
+  const [loadingLocations, setLoadingLocations] = useState(false)
+  const [savingBusinessId, setSavingBusinessId] = useState<string | null>(null)
+  const [showAddPanel, setShowAddPanel] = useState(false)
+
+  const loadSession = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+
+    if (!session?.user) {
       setCheckingSession(false)
+      return
     }
-    fetchUser()
+
+    setUserId(session.user.id)
+    setAccessToken(session.access_token ?? null)
+
+    await fetch("/api/ensure-user", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        "Content-Type": "application/json",
+      },
+    })
+
+    setCheckingSession(false)
   }, [])
 
-  // Redirect to login if no user after session check
+  const loadConnectedBusinesses = useCallback(async (uid: string) => {
+    setLoadingBusinesses(true)
+
+    const { data, error } = await supabase
+      .from("businesses")
+      .select("id, name, account_id, connected_at, location_id, google_location_id")
+      .eq("user_id", uid)
+      .order("connected_at", { ascending: false })
+
+    if (error) {
+      // Fallback for schemas that don't include one of these columns.
+      const fallback = await supabase
+        .from("businesses")
+        .select("id, name")
+        .eq("user_id", uid)
+
+      if (fallback.error) {
+        console.error("Failed to load businesses", fallback.error)
+        setConnectedBusinesses([])
+      } else {
+        setConnectedBusinesses((fallback.data || []) as ConnectedBusiness[])
+      }
+    } else {
+      setConnectedBusinesses((data || []) as ConnectedBusiness[])
+    }
+
+    setLoadingBusinesses(false)
+  }, [])
+
+  const fetchLocations = useCallback(async () => {
+    if (!accessToken) return
+
+    setLoadingLocations(true)
+
+    try {
+      const res = await fetch("/api/google-locations", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      })
+
+      const data = await res.json()
+      if (res.ok) {
+        setLocations(Array.isArray(data.locations) ? data.locations : [])
+      } else {
+        console.error("Failed to fetch locations", data)
+      }
+    } catch (err) {
+      console.error("Error fetching locations", err)
+    } finally {
+      setLoadingLocations(false)
+    }
+  }, [accessToken])
+
+  useEffect(() => {
+    loadSession()
+  }, [loadSession])
+
   useEffect(() => {
     if (!checkingSession && !userId) {
       router.push("/login")
     }
   }, [checkingSession, userId, router])
 
-  // -------------------------
-  // 2️⃣ Fetch Google locations
-  // -------------------------
   useEffect(() => {
-    async function fetchLocations() {
-      if (!userId || !accessToken) return
-      setLoading(true)
-      try {
-        const res = await fetch(`/api/google-locations`, {
-          headers: {
-            "Authorization": `Bearer ${accessToken}`
-          }
-        })
-        if (res.ok) {
-          const data = await res.json()
-          if (data.locations && data.locations.length > 0) {
-            setLocations(data.locations)
-            setConnected(true)
-          }
-        }
-      } catch (err) {
-        console.error("Error fetching locations", err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchLocations()
-  }, [userId, accessToken])
+    if (!userId) return
+    loadConnectedBusinesses(userId)
+  }, [userId, loadConnectedBusinesses])
 
-  // -------------------------
-  // 3️⃣ Handle Supabase OAuth connect
-  // -------------------------
-  function handleConnect() {
+  const visibleLocations = useMemo(() => {
+    const existingKeys = new Set(
+      connectedBusinesses.map((business) => business.location_id || business.google_location_id).filter(Boolean),
+    )
+
+    return locations.filter((loc) => !existingKeys.has(loc.locationId))
+  }, [locations, connectedBusinesses])
+
+  function handleConnectGoogle() {
+    if (!userId) return
     router.push(`/api/connect-google-business?userId=${userId}`)
   }
 
-  // -------------------------
-  // 4️⃣ Handle selecting a location
-  // -------------------------
-  async function handleSelect(location: Location) {
-    if (!userId || !accessToken) return
-    setLoading(true)
+  async function handleAddAnotherClick() {
+    setShowAddPanel(true)
+    await fetchLocations()
+  }
+
+  async function handleSelectLocation(location: Location) {
+    if (!accessToken || !userId) return
+
+    setSavingBusinessId(location.locationId)
+
     try {
       const res = await fetch("/api/save-business", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${accessToken}`,
-          "Content-Type": "application/json"
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          account_id: userId,
+          account_id: location.accountId || userId,
           location_id: location.locationId,
           name: location.name,
         }),
       })
+
       const data = await res.json()
-      if (data.success) {
-        router.push("/dashboard")
+      if (!res.ok || !data.success) {
+        console.error("Error saving business", data)
+        return
       }
+
+      await loadConnectedBusinesses(userId)
+      setShowAddPanel(false)
     } catch (err) {
       console.error("Error saving business", err)
     } finally {
-      setLoading(false)
+      setSavingBusinessId(null)
     }
   }
 
   if (checkingSession) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-        <div className="mx-auto max-w-4xl px-4 pt-10">
-          <div className="rounded-2xl border border-slate-200 bg-white/90 p-8 text-center shadow-sm backdrop-blur">
-            <p className="text-slate-600">Loading session...</p>
-          </div>
+      <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc" }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "32px 24px 40px" }}>
+          <section style={{ borderRadius: 20, border: "1px solid #e2e8f0", backgroundColor: "#fff", padding: 24 }}>
+            <p style={{ margin: 0, color: "#64748b", fontSize: 14 }}>Loading session...</p>
+          </section>
         </div>
       </div>
     )
   }
-  if (!userId) return null // prevent flicker
+
+  if (!userId) return null
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="mx-auto max-w-4xl px-4 pt-10">
-        <div className="rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-sm backdrop-blur md:p-8">
-          {!connected ? (
-            <div className="text-center">
-              <div className="mb-3 inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-4 py-1.5 text-sm font-medium text-blue-700">
-                Setup Required
+    <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc" }}>
+      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "32px 24px 40px" }}>
+        <section style={{
+          marginBottom: 20,
+          borderRadius: 20,
+          overflow: "hidden",
+          border: "1px solid #e2e8f0",
+          backgroundColor: "#fff",
+          boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
+        }}>
+          <div style={{ backgroundColor: "#0f172a", padding: "24px 32px" }}>
+            <p style={{ margin: 0, fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", fontWeight: 700, color: "#93c5fd" }}>
+              Business management
+            </p>
+            <h1 style={{ margin: "8px 0 0", fontSize: 30, fontWeight: 800, color: "#fff", letterSpacing: "-0.4px" }}>
+              Connect and manage businesses
+            </h1>
+            <p style={{ marginTop: 8, marginBottom: 0, maxWidth: 680, fontSize: 13, color: "#94a3b8" }}>
+              Keep your connected locations in one place. Add another business anytime and choose where reviews sync from.
+            </p>
+          </div>
+
+          <div style={{ padding: "20px 32px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div>
+                <p style={{ margin: 0, fontSize: 12, color: "#64748b", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                  Connected businesses
+                </p>
+                <p style={{ margin: "6px 0 0", fontSize: 20, color: "#0f172a", fontWeight: 800 }}>
+                  {connectedBusinesses.length}
+                </p>
               </div>
-              <h1 className="mb-3 text-2xl font-bold text-slate-900 md:text-3xl">Connect Your Google Business</h1>
-              <p className="mx-auto mb-6 max-w-2xl text-slate-600">
-                We need access to your Google Business locations to fetch reviews and start generating AI-assisted replies.
-              </p>
+
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={handleConnectGoogle}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: 10,
+                    border: "1px solid #1d4ed8",
+                    backgroundColor: "#2563eb",
+                    color: "#fff",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                >
+                  Connect Google
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleAddAnotherClick}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: 10,
+                    border: "1px solid #94a3b8",
+                    backgroundColor: "#f8fafc",
+                    color: "#1e293b",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                >
+                  Add another business
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section style={{ borderRadius: 16, border: "1px solid #e2e8f0", backgroundColor: "#fff", boxShadow: "0 1px 6px rgba(0,0,0,0.05)", overflow: "hidden" }}>
+          <div style={{ padding: "14px 16px", borderBottom: "1px solid #e2e8f0", backgroundColor: "#f8fafc", fontSize: 12, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            Businesses list
+          </div>
+
+          {loadingBusinesses ? (
+            <div style={{ padding: 16, fontSize: 14, color: "#64748b" }}>Loading businesses...</div>
+          ) : connectedBusinesses.length === 0 ? (
+            <div style={{ padding: 16, fontSize: 14, color: "#64748b" }}>No businesses connected yet. Click &quot;Connect Google&quot; to start.</div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ backgroundColor: "#f8fafc" }}>
+                    <th style={{ textAlign: "left", padding: "12px 14px", fontSize: 12, color: "#64748b" }}>Business</th>
+                    <th style={{ textAlign: "left", padding: "12px 14px", fontSize: 12, color: "#64748b" }}>Location ID</th>
+                    <th style={{ textAlign: "left", padding: "12px 14px", fontSize: 12, color: "#64748b" }}>Connected</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {connectedBusinesses.map((business) => (
+                    <tr key={business.id} style={{ borderTop: "1px solid #e2e8f0" }}>
+                      <td style={{ padding: "12px 14px", fontSize: 14, color: "#0f172a", fontWeight: 600 }}>
+                        {business.name || "Unnamed business"}
+                      </td>
+                      <td style={{ padding: "12px 14px", fontSize: 13, color: "#334155" }}>
+                        {business.location_id || business.google_location_id || "-"}
+                      </td>
+                      <td style={{ padding: "12px 14px", fontSize: 13, color: "#334155" }}>
+                        {business.connected_at ? new Date(business.connected_at).toLocaleString() : "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        {showAddPanel && (
+          <section style={{ marginTop: 20, borderRadius: 16, border: "1px solid #e2e8f0", backgroundColor: "#fff", boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
+            <div style={{ padding: "14px 16px", borderBottom: "1px solid #e2e8f0", backgroundColor: "#eff6ff", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: "#1e3a8a" }}>Available locations</p>
               <button
-                onClick={handleConnect}
-                className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-6 py-3 font-medium text-white transition hover:bg-blue-700"
+                type="button"
+                onClick={() => setShowAddPanel(false)}
+                style={{
+                  border: "1px solid #93c5fd",
+                  backgroundColor: "#fff",
+                  color: "#1d4ed8",
+                  borderRadius: 8,
+                  padding: "6px 10px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
               >
-                Connect Google Business
+                Close
               </button>
             </div>
-          ) : (
-            <div className="text-center">
-              <div className="mb-3 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-sm font-medium text-emerald-700">
-                Connected Successfully
-              </div>
-              <h1 className="mb-3 text-2xl font-bold text-slate-900 md:text-3xl">Select a Business Location</h1>
-              <p className="mx-auto mb-6 max-w-2xl text-slate-600">
-                Choose which location you want to manage with AI-assisted review replies.
-              </p>
 
-              {loading ? (
-                <p className="text-slate-600">Loading locations...</p>
+            <div style={{ padding: 16 }}>
+              {loadingLocations ? (
+                <p style={{ margin: 0, fontSize: 14, color: "#64748b" }}>Loading locations...</p>
+              ) : visibleLocations.length === 0 ? (
+                <p style={{ margin: 0, fontSize: 14, color: "#64748b" }}>No new locations available to add.</p>
               ) : (
-                <div className="mx-auto grid max-w-2xl gap-3">
-                  {locations.map((loc) => (
-                    <button
-                      key={loc.locationId}
-                      onClick={() => handleSelect(loc)}
-                      className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-left font-medium text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-green-200 hover:bg-green-50 hover:text-green-700"
-                    >
-                      {loc.name}
-                    </button>
-                  ))}
+                <div style={{ display: "grid", gap: 10 }}>
+                  {visibleLocations.map((location) => {
+                    const isSaving = savingBusinessId === location.locationId
+                    return (
+                      <button
+                        key={location.locationId}
+                        type="button"
+                        onClick={() => handleSelectLocation(location)}
+                        disabled={isSaving}
+                        style={{
+                          border: "1px solid #cbd5e1",
+                          backgroundColor: "#fff",
+                          borderRadius: 10,
+                          padding: "12px 14px",
+                          textAlign: "left",
+                          cursor: isSaving ? "not-allowed" : "pointer",
+                          opacity: isSaving ? 0.7 : 1,
+                        }}
+                      >
+                        <div style={{ fontSize: 14, color: "#0f172a", fontWeight: 700 }}>
+                          {location.name}
+                        </div>
+                        <div style={{ marginTop: 2, fontSize: 12, color: "#64748b" }}>
+                          Location ID: {location.locationId}
+                        </div>
+                        {isSaving && (
+                          <div style={{ marginTop: 6, fontSize: 12, color: "#2563eb", fontWeight: 700 }}>
+                            Saving...
+                          </div>
+                        )}
+                      </button>
+                    )
+                  })}
                 </div>
               )}
             </div>
-          )}
-        </div>
+          </section>
+        )}
       </div>
     </div>
   )

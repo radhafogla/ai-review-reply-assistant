@@ -1,9 +1,17 @@
+import Link from "next/link"
+
 const Footer = () => {
   return (
-    <footer className="text-center py-5 border-t">
-      <p className="text-gray-500">
-        © 2026 ReviewAI. All rights reserved.
-      </p>
+    <footer className="border-t bg-white/70 backdrop-blur-sm">
+      <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-5 text-sm text-gray-600 sm:flex-row sm:px-6 lg:px-8">
+        <p>© 2026 ReviewAI. All rights reserved.</p>
+        <Link
+          href="/privacy-policy"
+          className="font-medium text-blue-700 hover:text-blue-800"
+        >
+          Privacy Policy
+        </Link>
+      </div>
     </footer>
   )
 }

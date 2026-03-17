@@ -56,9 +56,13 @@ export async function GET(req: NextRequest) {
 
     const locationsData = await locationsRes.json()
 
+    const accountId = account.name.split("/").pop() || ""
     const locations: Location[] = (locationsData.locations || []).map((loc: Location) => ({
       locationId: loc.name.split("/").pop(),
       name: loc.title || loc.name,
+      accountId,
+      title: loc.title,
+      address: loc.address,
     }))
 
     return NextResponse.json({ locations })
