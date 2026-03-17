@@ -209,9 +209,6 @@ export default function ReviewCard({
 
         {/* avatar */}
         <div style={{
-          width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-          backgroundColor: "#2563eb", display: "flex",
-          alignItems: "center", justifyContent: "center",
           fontSize: 14, fontWeight: 700, color: "#ffffff",
         }}>
           {initials(review.author_name)}

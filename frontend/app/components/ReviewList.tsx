@@ -422,70 +422,8 @@ export default function ReviewList({ reviews }: Props) {
     <div style={{ borderRadius: 24, border: "1px solid #e2e8f0", backgroundColor: "#ffffff", boxShadow: "0 1px 6px rgba(0,0,0,0.07)" }}>
       {/* ── toolbar ─────────────────────────────────────────────────────── */}
       <div style={{ borderBottom: "1px solid #e2e8f0", backgroundColor: "#ffffff", padding: "16px 24px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: "#0f172a", margin: 0 }}>Reviews</h2>
-          <span style={{
-            fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 99,
-            backgroundColor: "#fef3c7", border: "1px solid #fde68a", color: "#78350f",
-          }}>
-            {selectedIds.size} selected
-          </span>
-        </div>
-
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          <button
-            type="button"
-            onClick={selectAllNeedsAttention}
-            style={{
-              padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-              cursor: "pointer", backgroundColor: "#f8fafc",
-              border: "1px solid #94a3b8", color: "#1e293b",
-            }}
-          >
-            Select all
-          </button>
-
-          <button
-            type="button"
-            onClick={clearSelected}
-            style={{
-              padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-              cursor: "pointer", backgroundColor: "#f8fafc",
-              border: "1px solid #94a3b8", color: "#1e293b",
-            }}
-          >
-            Clear
-          </button>
-
-          <button
-            type="button"
-            onClick={generateForSelected}
-            disabled={selectedIds.size === 0 || bulkGenerating}
-            style={{
-              padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-              cursor: selectedIds.size === 0 || bulkGenerating ? "not-allowed" : "pointer",
-              backgroundColor: selectedIds.size === 0 || bulkGenerating ? "#e2e8f0" : "#2563eb",
-              border: `1px solid ${selectedIds.size === 0 || bulkGenerating ? "#cbd5e1" : "#1d4ed8"}`,
-              color: selectedIds.size === 0 || bulkGenerating ? "#94a3b8" : "#ffffff",
-            }}
-          >
-            {bulkGenerating ? "Generating…" : `Generate (${selectedIds.size})`}
-          </button>
-
-          <button
-            type="button"
-            onClick={saveAndPostSelected}
-            disabled={selectedIds.size === 0 || bulkPosting}
-            style={{
-              padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-              cursor: selectedIds.size === 0 || bulkPosting ? "not-allowed" : "pointer",
-              backgroundColor: selectedIds.size === 0 || bulkPosting ? "#e2e8f0" : "#059669",
-              border: `1px solid ${selectedIds.size === 0 || bulkPosting ? "#cbd5e1" : "#047857"}`,
-              color: selectedIds.size === 0 || bulkPosting ? "#94a3b8" : "#ffffff",
-            }}
-          >
-            {bulkPosting ? "Posting…" : `Save & Post (${selectedIds.size})`}
-          </button>
         </div>
       </div>
 
@@ -526,6 +464,65 @@ export default function ReviewList({ reviews }: Props) {
 
             {isNeedsAttentionOpen && needsAttention.length > 0 && (
               <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                <span style={{
+                  fontSize: 12, fontWeight: 600, padding: "7px 10px", borderRadius: 8,
+                  backgroundColor: "#fef3c7", border: "1px solid #fde68a", color: "#78350f",
+                  whiteSpace: "nowrap",
+                }}>
+                  {selectedIds.size} selected
+                </span>
+                <button
+                  type="button"
+                  onClick={selectAllNeedsAttention}
+                  style={{
+                    padding: "7px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
+                    cursor: "pointer", backgroundColor: "#ffffff",
+                    border: "1px solid #f59e0b", color: "#b45309", whiteSpace: "nowrap",
+                  }}
+                >
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  onClick={clearSelected}
+                  style={{
+                    padding: "7px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
+                    cursor: "pointer", backgroundColor: "#ffffff",
+                    border: "1px solid #f59e0b", color: "#b45309", whiteSpace: "nowrap",
+                  }}
+                >
+                  Clear
+                </button>
+                <button
+                  type="button"
+                  onClick={generateForSelected}
+                  disabled={selectedIds.size === 0 || bulkGenerating}
+                  style={{
+                    padding: "7px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
+                    cursor: selectedIds.size === 0 || bulkGenerating ? "not-allowed" : "pointer",
+                    backgroundColor: selectedIds.size === 0 || bulkGenerating ? "#e2e8f0" : "#2563eb",
+                    border: `1px solid ${selectedIds.size === 0 || bulkGenerating ? "#cbd5e1" : "#1d4ed8"}`,
+                    color: selectedIds.size === 0 || bulkGenerating ? "#94a3b8" : "#ffffff",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {bulkGenerating ? "Generating…" : `Generate (${selectedIds.size})`}
+                </button>
+                <button
+                  type="button"
+                  onClick={saveAndPostSelected}
+                  disabled={selectedIds.size === 0 || bulkPosting}
+                  style={{
+                    padding: "7px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
+                    cursor: selectedIds.size === 0 || bulkPosting ? "not-allowed" : "pointer",
+                    backgroundColor: selectedIds.size === 0 || bulkPosting ? "#e2e8f0" : "#059669",
+                    border: `1px solid ${selectedIds.size === 0 || bulkPosting ? "#cbd5e1" : "#047857"}`,
+                    color: selectedIds.size === 0 || bulkPosting ? "#94a3b8" : "#ffffff",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {bulkPosting ? "Posting…" : `Save & Post (${selectedIds.size})`}
+                </button>
                 <button
                   type="button"
                   onClick={expandAllNA}

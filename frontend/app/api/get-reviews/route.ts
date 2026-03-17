@@ -32,22 +32,43 @@ export async function POST(req: NextRequest) {
 
   const userId = user.id;
 
+  const body = await req.json().catch(() => ({}));
+  const requestedBusinessId =
+    typeof body?.businessId === "string" && body.businessId.trim().length > 0
+      ? body.businessId.trim()
+      : null;
+
   console.log("get-reviews: fetching reviews for user", { userId });
 
-  const { data: business } = await supabase
+  const { data: businesses, error: businessesError } = await supabase
     .from("businesses")
-    .select("id")
+    .select("id, name")
     .eq("user_id", userId)
-    .single();
+    .order("id", { ascending: true });
 
-  if (!business) {
-    console.error("get-reviews: no business found for user", { userId });
-    return NextResponse.json({ reviews: null });
+  if (businessesError) {
+    console.error("get-reviews: failed loading businesses", { userId, error: businessesError.message });
+    return NextResponse.json(
+      { error: "Failed to load businesses", detail: businessesError.message, reviews: null },
+      { status: 500 },
+    );
   }
+
+  if (!businesses || businesses.length === 0) {
+    console.error("get-reviews: no business found for user", { userId });
+    return NextResponse.json({ reviews: [], businesses: [], selectedBusinessId: null });
+  }
+
+  const selectedBusiness = requestedBusinessId
+    ? businesses.find((business) => business.id === requestedBusinessId) ?? businesses[0]
+    : businesses[0];
+
+  const selectedBusinessId = selectedBusiness.id;
 
   console.log("get-reviews: found business for user", {
     userId,
-    businessId: business.id,
+    businessCount: businesses.length,
+    selectedBusinessId,
   });
 
   const { data: reviews, error } = await supabase
@@ -66,16 +87,17 @@ export async function POST(req: NextRequest) {
       created_at
     )
   `)
-  .eq("business_id", business.id)
-  .order("review_date", { ascending: false });
+    .eq("business_id", selectedBusinessId)
+    .order("review_date", { ascending: false });
 
   if (error) {
     console.error("get-reviews error:", error);
   }
   console.log("get-reviews: fetched reviews for user", {
     userId,
+    selectedBusinessId,
     reviewCount: reviews?.length,
   });
 
-  return NextResponse.json({ reviews });
+  return NextResponse.json({ reviews: reviews ?? [], businesses, selectedBusinessId });
 }

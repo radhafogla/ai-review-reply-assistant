@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
 
 import ReviewList from "../components/ReviewList"
@@ -12,6 +12,9 @@ export default function Dashboard() {
 
   const [reviews, setReviews] = useState<ReviewWithAnalysis[]>([])
   const [hasBusiness, setHasBusiness] = useState(true)
+  const [businesses, setBusinesses] = useState<Array<{ id: string; name: string | null; location_id: string | null }>>([])
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string>("")
+  const [loading, setLoading] = useState(false)
 
   const reviewsNeedingAttention =
     reviews.filter((review) => {
@@ -38,7 +41,9 @@ export default function Dashboard() {
       ? Math.round(((reviews.length - noReplyReviews) / reviews.length) * 100)
       : 0
 
-  async function loadReviews() {
+  const loadReviews = useCallback(async (businessId?: string) => {
+
+    setLoading(true)
 
     const { data: { session } } = await supabase.auth.getSession()
 
@@ -62,26 +67,44 @@ export default function Dashboard() {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json"
-      }
+      },
+      body: JSON.stringify({ businessId: businessId || undefined })
     })
 
     const data = await res.json()
 
-    if (!data.reviews) {
+    if (!Array.isArray(data?.reviews)) {
       setHasBusiness(false)
+      setLoading(false)
       return
     }
 
+    const nextBusinesses = Array.isArray(data?.businesses) ? data.businesses : []
+
+    if (nextBusinesses.length === 0) {
+      setHasBusiness(false)
+      setBusinesses([])
+      setReviews([])
+      setLoading(false)
+      return
+    }
+
+    setHasBusiness(true)
+    setBusinesses(nextBusinesses)
+    if (data?.selectedBusinessId) {
+      setSelectedBusinessId((prev) => (prev === data.selectedBusinessId ? prev : data.selectedBusinessId))
+    }
     setReviews(data.reviews)
-  }
+    setLoading(false)
+  }, [])
 
   useEffect(() => {
     const run = async () => {
-      await loadReviews()
+      await loadReviews(selectedBusinessId || undefined)
     }
 
     run()
-  }, [])
+  }, [selectedBusinessId, loadReviews])
 
   if (!hasBusiness) return <EmptyState />
 
@@ -115,8 +138,41 @@ export default function Dashboard() {
           {/* stats row */}
           <div style={{ padding: "24px 32px" }}>
 
-            {/* avg rating pill */}
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+            {/* business selector + avg rating */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <label htmlFor="business-filter" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#64748b" }}>
+                  Business scope
+                </label>
+                <select
+                  id="business-filter"
+                  value={selectedBusinessId}
+                  onChange={(e) => setSelectedBusinessId(e.target.value)}
+                  style={{
+                    minWidth: 280,
+                    borderRadius: 10,
+                    border: "1.5px solid #cbd5e1",
+                    backgroundColor: "#ffffff",
+                    color: "#0f172a",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    padding: "8px 12px",
+                    outline: "none",
+                  }}
+                >
+                  {businesses.map((business) => (
+                    <option key={business.id} value={business.id}>
+                      {business.name?.trim() || business.id}
+                    </option>
+                  ))}
+                </select>
+                {loading && (
+                  <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>
+                    Loading...
+                  </span>
+                )}
+              </div>
+
               <div style={{
                 display: "flex", alignItems: "center", gap: 8,
                 backgroundColor: "#fffbeb", border: "1px solid #fde68a",
