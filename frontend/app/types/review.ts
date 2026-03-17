@@ -6,6 +6,7 @@ export interface Review {
     review_text: string;
     created_at: string;
     review_date: string;
+  review_time?: string;
     latest_reply_id?: string;
     latest_reply?: ReviewReply
 }

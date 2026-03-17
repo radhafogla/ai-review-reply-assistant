@@ -1,11 +1,14 @@
 "use client"
 
 import { useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { motion } from "framer-motion"
 import { supabase } from "../../lib/supabaseClient";
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const showSessionExpiredNotice = searchParams.get("reason") === "session-expired"
 
   const handleGoogleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
@@ -50,6 +53,12 @@ export default function LoginPage() {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
       >
+        {showSessionExpiredNotice && (
+          <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+            Your session expired. Please sign in again.
+          </div>
+        )}
+
         <div className="mb-6 text-center">
           <motion.div
             className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-900 to-blue-600 text-xl font-semibold text-white shadow-md"
