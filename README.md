@@ -5,6 +5,7 @@ AI Review Reply Assistant is a Next.js application for connecting Google Busines
 ## What It Does
 
 - Connects one or more Google Business Profile locations to a user account
+- Supports both email/password authentication and Google OAuth sign-in
 - Syncs Google reviews into Supabase
 - Generates draft replies with OpenAI
 - Lets users edit drafts before posting them
@@ -49,9 +50,9 @@ AI Review Reply Assistant is a Next.js application for connecting Google Busines
 
 ## Main User Flow
 
-1. A user signs in with Supabase-authenticated Google login.
+1. A user signs in with Supabase using either email/password or Google OAuth.
 2. The app ensures a matching row exists in the local `users` table.
-3. The user connects a Google Business Profile account and saves one or more locations.
+3. After auth, the app routes users with at least one connected business to `/dashboard`; otherwise to `/connect-business`.
 4. Reviews are synced into Supabase.
 5. AI-generated draft replies are created with OpenAI.
 6. The user can edit the draft, save it as a user-authored draft, or post it directly.
@@ -70,10 +71,11 @@ The feature gates live in [frontend/lib/subscription.ts](frontend/lib/subscripti
 
 ## API Surface
 
-The app currently exposes 18 route handlers under [frontend/app/api](frontend/app/api):
+The app currently exposes 19 route handlers under [frontend/app/api](frontend/app/api):
 
 - `analytics`
 - `analyze-review`
+- `auth/signup`
 - `connect-google-business`
 - `contact`
 - `delete-account`
@@ -90,6 +92,14 @@ The app currently exposes 18 route handlers under [frontend/app/api](frontend/ap
 - `save-reply`
 - `subscription`
 - `sync-reviews`
+
+## Recent Auth And UX Updates
+
+- Replaced passwordless-only entry with first-class email/password login and signup in [frontend/app/login/page.tsx](frontend/app/login/page.tsx)
+- Added server-side signup route at [frontend/app/api/auth/signup/route.ts](frontend/app/api/auth/signup/route.ts) using Supabase admin create-user flow with immediate account usability
+- Hardened user provisioning in [frontend/app/api/ensure-user/route.ts](frontend/app/api/ensure-user/route.ts) to better handle duplicate-email and initialization edge cases
+- Added smart post-auth routing so users with an existing business land on `/dashboard`, otherwise on `/connect-business`
+- Improved login card layout to reduce vertical scrolling and tighten top spacing
 
 All API routes use structured request/error logging through [frontend/lib/apiLogger.ts](frontend/lib/apiLogger.ts).
 
