@@ -12,8 +12,7 @@ export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const showSessionExpiredNotice = searchParams.get("reason") === "session-expired"
-  const requestedMode: AuthMode = searchParams.get("mode") === "signup" ? "signup" : "login"
-  const [mode, setMode] = useState<AuthMode>(() => requestedMode)
+  const mode: AuthMode = searchParams.get("mode") === "signup" ? "signup" : "login"
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -62,8 +61,9 @@ export default function LoginPage() {
   }
 
   const switchMode = (nextMode: AuthMode) => {
-    setMode(nextMode)
+    if (nextMode === mode) return
     resetFeedback()
+    router.replace(`/login?mode=${nextMode}`)
   }
 
 
@@ -179,7 +179,7 @@ export default function LoginPage() {
 
     if (loginError) {
       setIsSubmitting(false)
-      setAuthError("Account created, but auto-login failed. Please log in with your new password.")
+      setAuthError("Account created, but auto sign-in failed. Please sign in with your new password.")
       return
     }
 
@@ -200,7 +200,7 @@ export default function LoginPage() {
 
   return (
     <motion.div
-      className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 px-4"
+      className="relative flex min-h-screen items-center justify-center overflow-x-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 px-4"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
@@ -221,9 +221,10 @@ export default function LoginPage() {
         />
       </div>
 
-      {/* Login card */}
+      {/* Auth card */}
       <motion.div
-        className="relative w-[90vw] max-w-[26rem] rounded-3xl border border-slate-300/80 bg-gradient-to-b from-white/95 to-slate-50/90 p-6 shadow-[0_12px_40px_-12px_rgba(15,23,42,0.28)] backdrop-blur md:max-w-[28rem] md:p-8"
+        className="relative box-border min-w-0 overflow-x-hidden rounded-3xl border border-slate-300/80 bg-gradient-to-b from-white/95 to-slate-50/90 p-6 shadow-[0_12px_40px_-12px_rgba(15,23,42,0.28)] backdrop-blur md:p-8"
+        style={{ width: "min(44rem, calc(100vw - 2rem))" }}
         initial={{ opacity: 0, y: 20, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
@@ -262,7 +263,7 @@ export default function LoginPage() {
               : "text-slate-600 hover:text-slate-900"
               }`}
           >
-            Log In
+            Sign In
           </button>
           <button
             type="button"
@@ -276,7 +277,7 @@ export default function LoginPage() {
           </button>
         </div>
 
-        <form className="space-y-3" onSubmit={mode === "login" ? handlePasswordLogin : handlePasswordSignup}>
+        <form className="min-w-0 space-y-3" onSubmit={mode === "login" ? handlePasswordLogin : handlePasswordSignup}>
           {mode === "signup" && (
             <>
               <label className="block text-sm font-medium text-slate-700" htmlFor="fullName">
@@ -310,14 +311,14 @@ export default function LoginPage() {
           />
 
           {isGmailAddress && (
-            <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-800">
+            <div className="flex min-w-0 items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-800">
               <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" aria-hidden="true">
                 <path fill="#4285F4" d="M21.805 12.041c0-.817-.066-1.412-.208-2.03H12.2v3.715h5.517c-.111.923-.711 2.313-2.045 3.247l-.019.124 2.972 2.258.206.02c1.89-1.712 2.974-4.23 2.974-7.334Z" />
                 <path fill="#34A853" d="M12.2 21.75c2.703 0 4.973-.87 6.63-2.375l-3.159-2.402c-.844.579-1.978.986-3.471.986-2.647 0-4.89-1.712-5.689-4.08l-.119.01-3.09 2.345-.041.111C4.907 19.56 8.304 21.75 12.2 21.75Z" />
                 <path fill="#FBBC05" d="M6.511 13.879A5.86 5.86 0 0 1 6.178 12c0-.653.111-1.287.311-1.879l-.006-.126-3.129-2.383-.102.048A9.63 9.63 0 0 0 2.178 12c0 1.55.378 3.016 1.074 4.34l3.259-2.461Z" />
                 <path fill="#EA4335" d="M12.2 6.041c1.882 0 3.149.801 3.87 1.47l2.826-2.699C17.162 3.263 14.903 2.25 12.2 2.25c-3.896 0-7.293 2.19-8.948 5.41l3.237 2.46c.81-2.368 3.053-4.079 5.711-4.079Z" />
               </svg>
-              <span className="flex-1">Gmail detected &mdash; sign in faster with Google.</span>
+              <span className="min-w-0 flex-1">Gmail detected &mdash; sign in faster with Google.</span>
               <button
                 type="button"
                 onClick={handleGoogleLogin}
@@ -360,19 +361,21 @@ export default function LoginPage() {
             </>
           )}
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-500"
-          >
-            {isSubmitting
-              ? mode === "login"
-                ? "Logging in..."
-                : "Creating account..."
-              : mode === "login"
-                ? "Log In"
-                : "Create Account"}
-          </button>
+          <div className="pt-4">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-500"
+            >
+              {isSubmitting
+                ? mode === "login"
+                  ? "Signing in..."
+                  : "Creating account..."
+                : mode === "login"
+                  ? "Sign In"
+                  : "Create Account"}
+            </button>
+          </div>
 
           <p className="text-xs leading-5 text-slate-500">
             {mode === "login"
@@ -380,23 +383,25 @@ export default function LoginPage() {
               : "Your account will use this email and password for future sign-ins."}
           </p>
 
-          {mode === "login" ? (
-            <button
-              type="button"
-              onClick={() => switchMode("signup")}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600"
-            >
-              Need an account? Sign Up
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => switchMode("login")}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600"
-            >
-              Already have an account? Log In
-            </button>
-          )}
+          <div className="pt-4">
+            {mode === "login" ? (
+              <button
+                type="button"
+                onClick={() => switchMode("signup")}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600"
+              >
+                Need an account? Sign Up
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => switchMode("login")}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600"
+              >
+                Already have an account? Sign In
+              </button>
+            )}
+          </div>
         </form>
 
         {authNotice && (

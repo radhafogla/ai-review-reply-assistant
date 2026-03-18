@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
 
     if (existingByEmail) {
       return NextResponse.json(
-        { error: "An account already exists for this email. Please log in or use a different email." },
+        { error: "An account already exists for this email. Please sign in or use a different email." },
         { status: 409 },
       )
     }
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     if (createAuthError) {
       const normalized = createAuthError.message.toLowerCase()
       if (normalized.includes("already") || normalized.includes("exists")) {
-        return NextResponse.json({ error: "An account with this email already exists. Please log in." }, { status: 409 })
+        return NextResponse.json({ error: "An account with this email already exists. Please sign in." }, { status: 409 })
       }
 
       return NextResponse.json({ error: createAuthError.message }, { status: 400 })

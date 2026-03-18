@@ -39,7 +39,7 @@ export default function SettingsPage() {
       const token = sessionData.session?.access_token
 
       if (!token) {
-        alert("Session expired. Please log in again.")
+        alert("Session expired. Please sign in again.")
         return
       }
 
@@ -78,7 +78,7 @@ export default function SettingsPage() {
       const token = sessionData.session?.access_token
 
       if (!token) {
-        alert("Session expired. Please log in again.")
+        alert("Session expired. Please sign in again.")
         return
       }
 

@@ -25,7 +25,7 @@ export default function SettingsModal({ isOpen, onClose, userEmail }: Props) {
       const token = sessionData.session?.access_token
 
       if (!token) {
-        alert("Session expired. Please log in again.")
+        alert("Session expired. Please sign in again.")
         return
       }
 
@@ -65,7 +65,7 @@ export default function SettingsModal({ isOpen, onClose, userEmail }: Props) {
       const token = sessionData.session?.access_token
 
       if (!token) {
-        alert("Session expired. Please log in again.")
+        alert("Session expired. Please sign in again.")
         return
       }
 
