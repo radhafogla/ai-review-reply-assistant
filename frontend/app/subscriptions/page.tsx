@@ -1,34 +1,64 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useSubscription } from "@/app/hooks/useSubscription"
-import { PLAN_FEATURES, getPlanLabel, type SubscriptionPlan } from "@/lib/subscription"
-
-const PLAN_ORDER: SubscriptionPlan[] = ["free", "basic", "premium"]
-
-const PLAN_DESCRIPTIONS: Record<SubscriptionPlan, string> = {
-  free: "14-day trial with core workflow features and single-business setup.",
-  basic: "Built for growing teams that need AI speed and analytics visibility.",
-  premium: "Full suite with advanced controls for multi-business operations.",
-}
-
-const PLAN_PRICING: Record<SubscriptionPlan, string> = {
-  free: "$0 for 14 days",
-  basic: "$19 / month",
-  premium: "$49 / month",
-}
-
-const FEATURES = [
-  { key: "analytics", label: "Analytics page" },
-  { key: "aiGeneration", label: "AI reply generation" },
-  { key: "bulkActions", label: "Bulk generate and post" },
-  { key: "multiBusiness", label: "Multiple connected businesses" },
-] as const
+import {
+  PLAN_FEATURE_ORDER,
+  PLAN_FEATURES,
+  PLAN_ORDER,
+  PREMIUM_AUTO_REPLY_DEFAULT_MIN_RATING,
+  getFeatureLabel,
+  getPlanDescription,
+  getPlanLabel,
+  getPlanPrice,
+  getPlanUsageLabel,
+  type SubscriptionPlan,
+} from "@/lib/subscription"
+import { supabase } from "@/lib/supabaseClient"
 
 export default function SubscriptionsPage() {
   const { loading, subscription, changePlan } = useSubscription()
   const [updatingPlan, setUpdatingPlan] = useState<SubscriptionPlan | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [autoReplyLoading, setAutoReplyLoading] = useState(false)
+  const [autoReplyEnabled, setAutoReplyEnabled] = useState(false)
+  const [autoReplyMinRating, setAutoReplyMinRating] = useState(PREMIUM_AUTO_REPLY_DEFAULT_MIN_RATING)
+
+  async function getAccessToken() {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    return session?.access_token ?? null
+  }
+
+  async function loadAutoReplySettings() {
+    if (subscription.plan !== "premium") return
+    setAutoReplyLoading(true)
+
+    try {
+      const token = await getAccessToken()
+      if (!token) return
+
+      const res = await fetch("/api/premium-auto-reply", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (!res.ok) return
+
+      const data = await res.json()
+      setAutoReplyEnabled(Boolean(data?.enabled))
+      setAutoReplyMinRating(Number(data?.minRating ?? PREMIUM_AUTO_REPLY_DEFAULT_MIN_RATING))
+    } finally {
+      setAutoReplyLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (subscription.plan !== "premium") return
+    void loadAutoReplySettings()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subscription.plan])
 
   async function handlePlanChange(plan: SubscriptionPlan) {
     setError(null)
@@ -41,6 +71,38 @@ export default function SubscriptionsPage() {
       setError(message)
     } finally {
       setUpdatingPlan(null)
+    }
+  }
+
+  async function saveAutoReplySettings(nextEnabled: boolean, minRating: number) {
+    setAutoReplyLoading(true)
+    setError(null)
+
+    try {
+      const token = await getAccessToken()
+      if (!token) throw new Error("Unauthorized")
+
+      const res = await fetch("/api/premium-auto-reply", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ enabled: nextEnabled, minRating }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to save auto-reply settings")
+      }
+
+      setAutoReplyEnabled(Boolean(data?.enabled))
+      setAutoReplyMinRating(Number(data?.minRating ?? PREMIUM_AUTO_REPLY_DEFAULT_MIN_RATING))
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save auto-reply settings"
+      setError(message)
+    } finally {
+      setAutoReplyLoading(false)
     }
   }
 
@@ -82,6 +144,41 @@ export default function SubscriptionsPage() {
             )}
             {error && <span style={{ fontSize: 13, color: "#b91c1c", fontWeight: 700 }}>{error}</span>}
           </div>
+
+          <div style={{ padding: "0 32px 20px" }}>
+            <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, backgroundColor: "#f8fafc", padding: 14 }}>
+              <p style={{ margin: 0, fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#475569" }}>
+                Current usage (soft limits)
+              </p>
+              <p style={{ margin: "8px 0 0", fontSize: 13, color: "#334155", fontWeight: 600 }}>
+                {getPlanUsageLabel("monthlyAiGenerations")}: {subscription.usage.monthlyAiGenerations} / {subscription.limits.monthlyAiGenerations}
+              </p>
+              <p style={{ margin: "4px 0 0", fontSize: 13, color: "#334155", fontWeight: 600 }}>
+                {getPlanUsageLabel("connectedBusinesses")}: {subscription.usage.connectedBusinesses} / {subscription.limits.connectedBusinesses}
+              </p>
+
+              {subscription.warnings.length > 0 && (
+                <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
+                  {subscription.warnings.map((warning) => (
+                    <div
+                      key={warning.key}
+                      style={{
+                        borderRadius: 8,
+                        border: warning.severity === "warning" ? "1px solid #fca5a5" : "1px solid #fde68a",
+                        backgroundColor: warning.severity === "warning" ? "#fef2f2" : "#fffbeb",
+                        color: warning.severity === "warning" ? "#991b1b" : "#92400e",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        padding: "8px 10px",
+                      }}
+                    >
+                      {warning.label}: {warning.used}/{warning.limit} ({warning.percentUsed}%)
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </section>
 
         <section style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
@@ -101,14 +198,14 @@ export default function SubscriptionsPage() {
                 }}
               >
                 <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0f172a" }}>{getPlanLabel(plan)}</h2>
-                <p style={{ margin: "4px 0 0", fontSize: 13, color: "#334155", fontWeight: 700 }}>{PLAN_PRICING[plan]}</p>
-                <p style={{ margin: "10px 0 0", fontSize: 13, lineHeight: 1.6, color: "#64748b" }}>{PLAN_DESCRIPTIONS[plan]}</p>
+                <p style={{ margin: "4px 0 0", fontSize: 13, color: "#334155", fontWeight: 700 }}>{getPlanPrice(plan)}</p>
+                <p style={{ margin: "10px 0 0", fontSize: 13, lineHeight: 1.6, color: "#64748b" }}>{getPlanDescription(plan)}</p>
 
                 <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
-                  {FEATURES.map((feature) => {
-                    const enabled = PLAN_FEATURES[plan][feature.key]
+                  {PLAN_FEATURE_ORDER.map((featureKey) => {
+                    const enabled = PLAN_FEATURES[plan][featureKey]
                     return (
-                      <div key={feature.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div key={featureKey} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{
                           width: 18,
                           height: 18,
@@ -123,7 +220,7 @@ export default function SubscriptionsPage() {
                         }}>
                           {enabled ? "✓" : "-"}
                         </span>
-                        <span style={{ fontSize: 13, color: "#334155", fontWeight: 600 }}>{feature.label}</span>
+                        <span style={{ fontSize: 13, color: "#334155", fontWeight: 600 }}>{getFeatureLabel(featureKey)}</span>
                       </div>
                     )
                   })}
@@ -153,6 +250,53 @@ export default function SubscriptionsPage() {
             )
           })}
         </section>
+
+        {subscription.plan === "premium" && (
+          <section style={{ marginTop: 20, border: "1px solid #e2e8f0", borderRadius: 16, backgroundColor: "#fff", padding: 18 }}>
+            <h3 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#0f172a" }}>Premium auto-reply</h3>
+            <p style={{ margin: "8px 0 0", fontSize: 13, color: "#475569" }}>
+              Automatically generate and post replies for high-rating reviews after sync. Default is OFF.
+            </p>
+
+            <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => void saveAutoReplySettings(!autoReplyEnabled, autoReplyMinRating)}
+                disabled={autoReplyLoading}
+                style={{
+                  borderRadius: 10,
+                  border: "1px solid #1d4ed8",
+                  backgroundColor: autoReplyEnabled ? "#1d4ed8" : "#e2e8f0",
+                  color: autoReplyEnabled ? "#fff" : "#334155",
+                  fontSize: 13,
+                  fontWeight: 800,
+                  padding: "8px 14px",
+                  cursor: autoReplyLoading ? "not-allowed" : "pointer",
+                }}
+              >
+                {autoReplyLoading ? "Saving..." : autoReplyEnabled ? "Enabled" : "Disabled"}
+              </button>
+
+              <label style={{ fontSize: 13, color: "#334155", fontWeight: 700 }} htmlFor="auto-reply-min-rating">
+                Minimum rating
+              </label>
+              <select
+                id="auto-reply-min-rating"
+                value={autoReplyMinRating}
+                disabled={autoReplyLoading}
+                onChange={(e) => {
+                  const value = Number(e.target.value)
+                  setAutoReplyMinRating(value)
+                  void saveAutoReplySettings(autoReplyEnabled, value)
+                }}
+                style={{ borderRadius: 8, border: "1px solid #cbd5e1", padding: "6px 10px", fontSize: 13 }}
+              >
+                <option value={5}>5 stars</option>
+                <option value={4}>4+ stars</option>
+              </select>
+            </div>
+          </section>
+        )}
       </div>
     </main>
   )

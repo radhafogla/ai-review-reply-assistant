@@ -1,5 +1,5 @@
 import { createServerClient } from "@/lib/supabaseServerClient"
-import { hasFeature, normalizePlan } from "@/lib/subscription"
+import { getConnectedBusinessLimitExceededMessage, getPlanLimits, hasFeature, normalizePlan } from "@/lib/subscription"
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
 import { trackUsageEvent } from "@/lib/usageTracking"
 import { NextResponse } from "next/server"
@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle()
 
     const plan = normalizePlan(userRow?.plan)
+    const connectedBusinessLimit = getPlanLimits(plan).connectedBusinesses
 
     if (!hasFeature(plan, "multiBusiness")) {
       const { count, error: countError } = await supabase
@@ -57,9 +58,9 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      if ((count || 0) >= 1) {
+      if ((count || 0) >= connectedBusinessLimit) {
         return NextResponse.json(
-          { error: "Your plan allows only one connected business. Upgrade to Premium to add more." },
+          { error: getConnectedBusinessLimitExceededMessage(connectedBusinessLimit) },
           { status: 403 }
         )
       }

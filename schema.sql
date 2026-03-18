@@ -182,6 +182,8 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
     "trial_start" timestamp with time zone DEFAULT "now"(),
     "trial_end" timestamp with time zone,
     "plan" "text" DEFAULT 'free'::"text",
+    "premium_auto_reply_enabled" boolean DEFAULT false NOT NULL,
+    "premium_auto_reply_min_rating" integer DEFAULT 5 NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"(),
     "updated_at" timestamp with time zone DEFAULT "now"()
 );

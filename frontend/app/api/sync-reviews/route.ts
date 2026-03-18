@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import OpenAI from "openai"
 import { createServerClient, createServiceClient } from "@/lib/supabaseServerClient"
 import { getValidAccessToken } from "@/lib/googleAuth"
 import { GoogleReview, GoogleReviewListResponse } from "@/app/types/googleReview"
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
 import { trackUsageEvent } from "@/lib/usageTracking"
+import { PREMIUM_AUTO_REPLY_DEFAULT_MIN_RATING, hasFeature, normalizePlan } from "@/lib/subscription"
 
 interface StoredReview {
   review_id: string
@@ -28,6 +30,7 @@ interface FormattedReview {
 }
 
 const ACTIONABLE_REVIEW_WINDOW_DAYS = 30
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 const STAR_RATING_TO_NUMBER: Record<string, number> = {
   ONE: 1,
@@ -112,6 +115,24 @@ function shouldUpsert(
     existingReview.needs_ai_reply !== nextReview.needs_ai_reply ||
     existingReview.is_actionable !== nextReview.is_actionable
   )
+}
+
+async function generateAutoReply(review: FormattedReview) {
+  const prompt = `
+You are replying to a Google review as a business owner.
+
+Rating: ${review.rating} stars
+Review: "${review.review_text}"
+
+Write a professional and friendly reply under 80 words. You dont need to address/greet the user or add regards at the end. Just the message itself is good.
+`
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: prompt }],
+  })
+
+  return String(completion.choices[0]?.message?.content ?? "").trim()
 }
 
 async function fetchGoogleReviews(
@@ -206,6 +227,17 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  const { data: userRow } = await supabase
+    .from("users")
+    .select("plan, premium_auto_reply_enabled, premium_auto_reply_min_rating")
+    .eq("id", userId)
+    .maybeSingle()
+
+  const userPlan = normalizePlan(userRow?.plan)
+  const autoReplyAvailable = hasFeature(userPlan, "premiumAutoReply")
+  const autoReplyEnabled = autoReplyAvailable && Boolean(userRow?.premium_auto_reply_enabled)
+  const autoReplyMinRating = Math.min(5, Math.max(1, Number(userRow?.premium_auto_reply_min_rating ?? PREMIUM_AUTO_REPLY_DEFAULT_MIN_RATING)))
+
   const { data: existingReviews, error: existingReviewsError } = await supabase
     .from("reviews")
     .select("review_id, author_name, rating, review_text, review_time, needs_ai_reply, is_actionable")
@@ -258,6 +290,12 @@ export async function POST(req: NextRequest) {
     const reviewsToUpsert = formattedReviews.filter((review) =>
       shouldUpsert(existingByReviewId.get(review.review_id), review)
     )
+
+    const autoReplyCandidates = autoReplyEnabled
+      ? formattedReviews.filter(
+          (review) => review.needs_ai_reply && review.is_actionable && review.rating >= autoReplyMinRating,
+        )
+      : []
 
     if (reviewsToUpsert.length > 0) {
       const serviceSupabase = createServiceClient()
@@ -321,6 +359,132 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    let autoReplyAttempted = 0
+    let autoReplyPosted = 0
+    let autoReplyFailed = 0
+
+    if (autoReplyCandidates.length > 0) {
+      const reviewIdsForCandidates = autoReplyCandidates.map((review) => review.review_id)
+      const { data: reviewRows } = await serviceSupabase
+        .from("reviews")
+        .select("id, review_id")
+        .eq("business_id", business.id)
+        .in("review_id", reviewIdsForCandidates)
+
+      const reviewIdByExternalId = new Map((reviewRows ?? []).map((row) => [row.review_id, row.id]))
+
+      for (const candidate of autoReplyCandidates) {
+        const localReviewId = reviewIdByExternalId.get(candidate.review_id)
+        if (!localReviewId) {
+          continue
+        }
+
+        autoReplyAttempted += 1
+        await trackUsageEvent({
+          requestId,
+          endpoint,
+          eventType: "auto_reply_attempted",
+          userId,
+          businessId: business.id,
+          reviewId: localReviewId,
+          metadata: { rating: candidate.rating, minRating: autoReplyMinRating },
+        })
+
+        try {
+          const replyText = await generateAutoReply(candidate)
+
+          if (!replyText) {
+            throw new Error("Generated auto-reply was empty")
+          }
+
+          const googleReplyUrl = `https://mybusiness.googleapis.com/v4/accounts/${business.account_id}/locations/${business.location_id}/reviews/${candidate.review_id}/reply`
+
+          const postRes = await fetch(googleReplyUrl, {
+            method: "PUT",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ comment: replyText }),
+          })
+
+          if (!postRes.ok) {
+            const detail = await postRes.text()
+            throw new Error(`Google post failed: ${postRes.status} ${detail}`)
+          }
+
+          const { data: insertedReply, error: insertReplyError } = await serviceSupabase
+            .from("review_replies")
+            .insert({
+              review_id: localReviewId,
+              user_id: userId,
+              reply_text: replyText,
+              source: "system",
+              status: "posted",
+              posted_at: new Date().toISOString(),
+            })
+            .select("id")
+            .single()
+
+          if (insertReplyError || !insertedReply) {
+            throw new Error(insertReplyError?.message || "Failed to persist auto-posted reply")
+          }
+
+          await serviceSupabase
+            .from("reviews")
+            .update({ latest_reply_id: insertedReply.id, needs_ai_reply: false, is_actionable: false })
+            .eq("id", localReviewId)
+
+          autoReplyPosted += 1
+
+          await trackUsageEvent({
+            requestId,
+            endpoint,
+            eventType: "reply_generated",
+            userId,
+            reviewId: localReviewId,
+            metadata: { rating: candidate.rating, source: "system", mode: "premium_auto_reply" },
+          })
+
+          await trackUsageEvent({
+            requestId,
+            endpoint,
+            eventType: "auto_reply_posted",
+            userId,
+            businessId: business.id,
+            reviewId: localReviewId,
+            metadata: { rating: candidate.rating, minRating: autoReplyMinRating },
+          })
+        } catch (error) {
+          autoReplyFailed += 1
+          logApiError({
+            requestId,
+            endpoint,
+            userId,
+            status: 500,
+            message: "Premium auto-reply failed for review",
+            error,
+            reviewId: localReviewId,
+            businessId: business.id,
+          })
+
+          await trackUsageEvent({
+            requestId,
+            endpoint,
+            eventType: "auto_reply_failed",
+            userId,
+            businessId: business.id,
+            reviewId: localReviewId,
+            metadata: {
+              rating: candidate.rating,
+              minRating: autoReplyMinRating,
+              reason: error instanceof Error ? error.message : String(error),
+            },
+          })
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       fetchedCount: dedupedReviews.length,
@@ -328,7 +492,16 @@ export async function POST(req: NextRequest) {
       skippedCount: formattedReviews.length - reviewsToUpsert.length,
       actionableCount: formattedReviews.filter((review) => review.is_actionable).length,
       backlogCount: formattedReviews.filter((review) => review.needs_ai_reply && !review.is_actionable).length,
-      syncMode: latestKnownTimestamp > 0 ? "incremental" : "initial"
+      syncMode: latestKnownTimestamp > 0 ? "incremental" : "initial",
+      autoReply: {
+        available: autoReplyAvailable,
+        enabled: autoReplyEnabled,
+        minRating: autoReplyMinRating,
+        candidateCount: autoReplyCandidates.length,
+        attempted: autoReplyAttempted,
+        posted: autoReplyPosted,
+        failed: autoReplyFailed,
+      },
     })
   } catch (error) {
     logApiError({

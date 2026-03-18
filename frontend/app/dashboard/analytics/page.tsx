@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabaseClient"
 import { useSubscription } from "@/app/hooks/useSubscription"
-import { hasFeature } from "@/lib/subscription"
+import { getFeatureGateTitle, getFeatureGateUpgradeHint, hasFeature } from "@/lib/subscription"
 import EmptyState from "@/app/components/EmptyState"
 
 type Bucket = { label: string; value: number }
@@ -166,9 +166,9 @@ export default function AnalyticsPage() {
       <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc", padding: "32px 24px 40px" }}>
         <div style={{ maxWidth: 980, margin: "0 auto" }}>
           <section style={{ borderRadius: 16, border: "1px solid #bfdbfe", backgroundColor: "#eff6ff", padding: 24 }}>
-            <h1 style={{ margin: 0, fontSize: 26, color: "#1e3a8a", fontWeight: 800 }}>Analytics is not available on Free</h1>
+            <h1 style={{ margin: 0, fontSize: 26, color: "#1e3a8a", fontWeight: 800 }}>{getFeatureGateTitle("analytics")}</h1>
             <p style={{ marginTop: 8, marginBottom: 0, color: "#334155", fontSize: 14, lineHeight: 1.7 }}>
-              Upgrade to Basic or Premium to view analytics charts and performance insights.
+              {getFeatureGateUpgradeHint("analytics")}
             </p>
             <Link
               href="/subscriptions"

@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
-import { normalizePlan, type SubscriptionPlan } from "@/lib/subscription"
+import { DEFAULT_SUBSCRIPTION_PLAN, createDefaultPlanLimits, createDefaultPlanUsage, normalizePlan, type SubscriptionPlan } from "@/lib/subscription"
+import type { LimitWarning, PlanLimits } from "@/lib/subscription"
 
 const SUBSCRIPTION_UPDATED_EVENT = "subscription-updated"
 
@@ -12,6 +13,9 @@ type SubscriptionState = {
   trialEnd: string | null
   trialExpired: boolean
   trialDaysRemaining: number | null
+  limits: PlanLimits
+  usage: PlanLimits
+  warnings: LimitWarning[]
 }
 
 function toSubscriptionState(data: unknown): SubscriptionState {
@@ -21,7 +25,17 @@ function toSubscriptionState(data: unknown): SubscriptionState {
     trialEnd?: unknown
     trialExpired?: unknown
     trialDaysRemaining?: unknown
+    limits?: unknown
+    usage?: unknown
+    warnings?: unknown
   }
+
+  const defaultLimits = createDefaultPlanLimits()
+  const defaultUsage = createDefaultPlanUsage()
+
+  const parsedLimits = (payload.limits ?? {}) as Partial<PlanLimits>
+  const parsedUsage = (payload.usage ?? {}) as Partial<PlanLimits>
+  const parsedWarnings = Array.isArray(payload.warnings) ? payload.warnings : []
 
   return {
     plan: normalizePlan(payload.plan),
@@ -29,17 +43,32 @@ function toSubscriptionState(data: unknown): SubscriptionState {
     trialEnd: typeof payload.trialEnd === "string" ? payload.trialEnd : null,
     trialExpired: Boolean(payload.trialExpired),
     trialDaysRemaining: typeof payload.trialDaysRemaining === "number" ? payload.trialDaysRemaining : null,
+    limits: {
+      monthlyAiGenerations: typeof parsedLimits.monthlyAiGenerations === "number" ? parsedLimits.monthlyAiGenerations : defaultLimits.monthlyAiGenerations,
+      connectedBusinesses: typeof parsedLimits.connectedBusinesses === "number" ? parsedLimits.connectedBusinesses : defaultLimits.connectedBusinesses,
+    },
+    usage: {
+      monthlyAiGenerations: typeof parsedUsage.monthlyAiGenerations === "number" ? parsedUsage.monthlyAiGenerations : defaultUsage.monthlyAiGenerations,
+      connectedBusinesses: typeof parsedUsage.connectedBusinesses === "number" ? parsedUsage.connectedBusinesses : defaultUsage.connectedBusinesses,
+    },
+    warnings: parsedWarnings as LimitWarning[],
   }
 }
 
 export function useSubscription() {
+  const defaultLimits = createDefaultPlanLimits()
+  const defaultUsage = createDefaultPlanUsage()
+
   const [loading, setLoading] = useState(true)
   const [subscription, setSubscription] = useState<SubscriptionState>({
-    plan: "free",
+    plan: DEFAULT_SUBSCRIPTION_PLAN,
     status: "active",
     trialEnd: null,
     trialExpired: false,
     trialDaysRemaining: null,
+    limits: defaultLimits,
+    usage: defaultUsage,
+    warnings: [],
   })
 
   const refresh = useCallback(async () => {
@@ -51,7 +80,7 @@ export function useSubscription() {
 
     const token = session?.access_token
     if (!token) {
-      setSubscription({ plan: "free", status: "active", trialEnd: null, trialExpired: false, trialDaysRemaining: null })
+      setSubscription(toSubscriptionState({}))
       setLoading(false)
       return
     }
@@ -67,13 +96,13 @@ export function useSubscription() {
       const data = await res.json()
 
       if (!res.ok) {
-        setSubscription({ plan: "free", status: "active", trialEnd: null, trialExpired: false, trialDaysRemaining: null })
+        setSubscription(toSubscriptionState({}))
         return
       }
 
       setSubscription(toSubscriptionState(data))
     } catch {
-      setSubscription({ plan: "free", status: "active", trialEnd: null, trialExpired: false, trialDaysRemaining: null })
+      setSubscription(toSubscriptionState({}))
     } finally {
       setLoading(false)
     }

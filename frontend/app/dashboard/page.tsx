@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabaseClient"
 import { useSubscription } from "@/app/hooks/useSubscription"
-import { hasFeature } from "@/lib/subscription"
+import { getTrialEndedUpgradeMessage, hasFeature } from "@/lib/subscription"
 
 import ReviewList from "../components/ReviewList"
 import EmptyState from "../components/EmptyState"
@@ -313,7 +313,7 @@ export default function Dashboard() {
             fontSize: 13,
             fontWeight: 700,
           }}>
-            Your Free Trial has ended. Choose Basic or Premium to continue advanced features.
+            {getTrialEndedUpgradeMessage()}
             <Link href="/subscriptions" style={{ marginLeft: 8, color: "#b91c1c", textDecoration: "underline" }}>
               View plans
             </Link>
@@ -332,6 +332,23 @@ export default function Dashboard() {
             fontWeight: 600,
           }}>
             Your current plan limits bulk actions. Upgrade in Subscriptions to unlock bulk generate and bulk post.
+          </div>
+        )}
+
+        {subscription.warnings.length > 0 && (
+          <div
+            style={{
+              marginTop: 16,
+              borderRadius: 12,
+              border: "1px solid #fde68a",
+              backgroundColor: "#fffbeb",
+              padding: "12px 14px",
+              color: "#92400e",
+              fontSize: 13,
+              fontWeight: 700,
+            }}
+          >
+            Usage notice: {subscription.warnings.map((warning) => `${warning.label} ${warning.used}/${warning.limit} (${warning.percentUsed}%)`).join(" • ")}
           </div>
         )}
 

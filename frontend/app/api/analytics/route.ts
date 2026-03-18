@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { createServerClient } from "@/lib/supabaseServerClient"
-import { hasFeature, normalizePlan } from "@/lib/subscription"
+import { getFeatureGateApiMessage, hasFeature, normalizePlan } from "@/lib/subscription"
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
 
 type Bucket = { label: string; value: number }
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
   if (!hasFeature(resolvedPlan, "analytics")) {
     logApiError({ requestId, endpoint, userId: user.id, status: 403, message: "Plan does not include analytics", error: "plan_gate", plan: resolvedPlan })
-    return NextResponse.json({ error: "Analytics is not included in your current plan" }, { status: 403 })
+    return NextResponse.json({ error: getFeatureGateApiMessage("analytics") }, { status: 403 })
   }
 
   const selectedBusinessId = selectedBusiness.id

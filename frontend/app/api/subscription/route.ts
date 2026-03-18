@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { createServerClient } from "@/lib/supabaseServerClient"
-import { normalizePlan } from "@/lib/subscription"
+import { buildLimitWarnings, getMonthRangeUtc, getPlanLimits, normalizePlan } from "@/lib/subscription"
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
 import { trackUsageEvent } from "@/lib/usageTracking"
 
@@ -54,6 +54,33 @@ export async function GET(req: NextRequest) {
 
   const resolvedPlan = normalizePlan(subscriptionRow?.plan || userRow?.plan)
   const status = typeof subscriptionRow?.status === "string" ? subscriptionRow.status : "active"
+  const planLimits = getPlanLimits(resolvedPlan)
+
+  const { monthStartIso, nextMonthStartIso } = getMonthRangeUtc()
+
+  const [{ count: monthlyAiGenerations }, { count: connectedBusinesses }] = await Promise.all([
+    supabase
+      .from("usage_events")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("event_type", "reply_generated")
+      .gte("occurred_at", monthStartIso)
+      .lt("occurred_at", nextMonthStartIso),
+    supabase
+      .from("businesses")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id),
+  ])
+
+  const usage = {
+    monthlyAiGenerations: monthlyAiGenerations ?? 0,
+    connectedBusinesses: connectedBusinesses ?? 0,
+  }
+
+  const warnings = buildLimitWarnings(resolvedPlan, {
+    monthlyAiGenerations: usage.monthlyAiGenerations,
+    connectedBusinesses: usage.connectedBusinesses,
+  })
 
   if (!subscriptionRow) {
     await supabase
@@ -73,12 +100,32 @@ export async function GET(req: NextRequest) {
       ? Math.max(0, Math.ceil(trialMsLeft / (1000 * 60 * 60 * 24)))
       : null
 
+  for (const warning of warnings) {
+    await trackUsageEvent({
+      requestId,
+      endpoint,
+      eventType: "limit_warning_shown",
+      userId: user.id,
+      metadata: {
+        plan: resolvedPlan,
+        limitKey: warning.key,
+        used: warning.used,
+        limit: warning.limit,
+        percentUsed: warning.percentUsed,
+        severity: warning.severity,
+      },
+    })
+  }
+
   return NextResponse.json({
     plan: resolvedPlan,
     status,
     trialEnd,
     trialExpired,
     trialDaysRemaining,
+    limits: planLimits,
+    usage,
+    warnings,
   })
 }
 

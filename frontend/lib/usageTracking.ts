@@ -2,7 +2,11 @@ import { createClient } from "@supabase/supabase-js"
 import { logApiRequest } from "@/lib/apiLogger"
 
 export type UsageEventType =
+  | "auto_reply_attempted"
+  | "auto_reply_failed"
+  | "auto_reply_posted"
   | "business_connected"
+  | "limit_warning_shown"
   | "reply_deleted"
   | "reply_generated"
   | "reply_posted"
