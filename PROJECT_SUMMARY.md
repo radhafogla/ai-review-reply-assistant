@@ -156,6 +156,22 @@ Notes:
 ## Suggested Next Milestones
 
 - Expand analytics depth beyond current KPI cards and pie charts
+- AI Review Insights Dashboard for Premium Subscription:
+   - Extract per review: sentiment (positive/neutral/negative), key topics (for example service, wait time, pricing), emotion (frustration, delight, disappointment), and intent (complaint, praise, suggestion)
+   - Show outcomes: percent positive vs negative over time, top recurring issues, and top praised aspects
+   - Example insight: "30% of negative reviews mention slow service"
+- Theme and Topic Clustering:
+   - Generate embeddings for reviews (OpenAI or similar) and cluster into themes
+   - Example clusters: Customer Service Issues, Food Quality, Delivery Delays
+   - Show outcomes: volume per cluster, sentiment per cluster, and trend over time
+- AI-Powered Business Suggestions:
+   - Feed AI with top negative themes, example reviews, and business category
+   - Return actionable recommendations for operators
+   - Example suggestion: "Customers frequently mention long wait times during weekends. Consider adding staff or implementing a booking system during peak hours."
+- Trend Detection:
+   - Track topic and sentiment evolution over time
+   - Example insights: "Complaints about wait time increased 22% this month" and "Staff friendliness mentions improving"
+   - Implementation approach: store topic + sentiment + timestamp and run periodic aggregation jobs
 - Add callback success/failure toast states for Google connection flow
 - Harden reliability around background automation and retry/failure workflows
 
