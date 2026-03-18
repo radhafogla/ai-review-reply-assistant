@@ -214,12 +214,20 @@ export default function Navbar() {
               Logout
             </button>
           ) : (
-            <Link
-              href="/login"
-              className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-6 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-600"
-            >
-              Login
-            </Link>
+            <>
+              <Link
+                href="/signup"
+                className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-6 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:border-blue-300 hover:text-blue-600"
+              >
+                Sign Up
+              </Link>
+              <Link
+                href="/login"
+                className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-6 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-600"
+              >
+                Login
+              </Link>
+            </>
           )}
         </div>
       </div>

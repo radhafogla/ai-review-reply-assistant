@@ -123,9 +123,29 @@ export default function ConnectBusiness() {
   const canUseMultiBusiness = hasFeature(subscription.plan, "multiBusiness")
   const hasReachedPlanLimit = !canUseMultiBusiness && connectedBusinesses.length >= 1
 
-  function handleConnectGoogle() {
-    if (!userId) return
-    router.push(`/api/connect-google-business?userId=${userId}`)
+  async function handleConnectGoogle() {
+    if (!accessToken) return
+
+    try {
+      const res = await fetch("/api/connect-google-business", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      const data = await res.json()
+
+      if (!res.ok || !data.url) {
+        console.error("Failed to initialize Google OAuth", data)
+        return
+      }
+
+      window.location.href = data.url
+    } catch (err) {
+      console.error("Error connecting Google", err)
+    }
   }
 
   async function handleAddAnotherClick() {

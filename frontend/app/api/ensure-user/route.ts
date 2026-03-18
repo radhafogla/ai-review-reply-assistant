@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     const { data: existingUser, error: lookupError } = await supabase
       .from("users")
       .select("id, plan, trial_end")
-      .eq("email", email)
+      .eq("id", user.id)
       .maybeSingle()
 
     if (lookupError) {
@@ -52,12 +52,21 @@ export async function POST(req: NextRequest) {
         .from("users")
         .update({
           name,
-          google_id: user.id,
+          email,
           trial_end: computedTrialEnd,
         })
         .eq("id", existingUser.id)
 
       if (updateError) {
+        logApiError({
+          requestId,
+          endpoint,
+          status: 500,
+          message: "Failed updating existing user",
+          error: updateError,
+          userId: user.id,
+          email,
+        })
         return NextResponse.json({ error: updateError.message }, { status: 500 })
       }
 
@@ -70,6 +79,14 @@ export async function POST(req: NextRequest) {
         .maybeSingle()
 
       if (subscriptionLookupError) {
+        logApiError({
+          requestId,
+          endpoint,
+          status: 500,
+          message: "Failed looking up subscription",
+          error: subscriptionLookupError,
+          userId: user.id,
+        })
         return NextResponse.json({ error: subscriptionLookupError.message }, { status: 500 })
       }
 
@@ -83,6 +100,14 @@ export async function POST(req: NextRequest) {
           })
 
         if (createSubscriptionError) {
+          logApiError({
+            requestId,
+            endpoint,
+            status: 500,
+            message: "Failed creating subscription for existing user",
+            error: createSubscriptionError,
+            userId: user.id,
+          })
           return NextResponse.json({ error: createSubscriptionError.message }, { status: 500 })
         }
       }
@@ -98,22 +123,60 @@ export async function POST(req: NextRequest) {
         id: user.id,
         email,
         name,
-        google_id: user.id,
         plan: "free",
         trial_end: trialEnd,
       })
 
     if (insertError) {
+      if (insertError.code === "23505" && /users_email_key/i.test(insertError.message)) {
+        logApiError({
+          requestId,
+          endpoint,
+          status: 409,
+          message: "Duplicate email in public.users - possible orphaned auth user or multi-provider account",
+          error: insertError,
+          email,
+          userId: user.id,
+        })
+        return NextResponse.json(
+          {
+            error: "An account already exists for this email with a different sign-in method. Use your original provider (for example Google) for this email, or contact support.",
+          },
+          { status: 409 },
+        )
+      }
+
+      logApiError({
+        requestId,
+        endpoint,
+        status: 500,
+        message: "Failed inserting new user record",
+        error: insertError,
+        email,
+        userId: user.id,
+      })
       return NextResponse.json({ error: insertError.message }, { status: 500 })
     }
 
-    await supabase
+    const { error: insertSubscriptionError } = await supabase
       .from("subscriptions")
       .insert({
         user_id: user.id,
         plan: "free",
         status: "active",
       })
+
+    if (insertSubscriptionError) {
+      logApiError({
+        requestId,
+        endpoint,
+        status: 500,
+        message: "Failed creating subscription for new user",
+        error: insertSubscriptionError,
+        userId: user.id,
+      })
+      return NextResponse.json({ error: insertSubscriptionError.message }, { status: 500 })
+    }
 
     return NextResponse.json({ success: true, action: "inserted" })
   } catch (err) {
