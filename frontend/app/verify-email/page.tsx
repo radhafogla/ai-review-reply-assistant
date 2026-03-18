@@ -1,7 +1,9 @@
-import { useNavigate } from "react-router-dom"
+  "use client"
+
+import { useRouter } from "next/navigation"
 
 const VerifyEmail = () => {
-  const navigate = useNavigate()
+  const router = useRouter()
 
   return (
     <div className="flex items-center justify-center h-screen">
@@ -17,7 +19,7 @@ const VerifyEmail = () => {
         </p>
 
         <button
-          onClick={() => navigate("/select-business")}
+          onClick={() => router.push("/connect-business")}
           className="bg-black text-white px-6 py-3 rounded-lg"
         >
           I Verified My Email
