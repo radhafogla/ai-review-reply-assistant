@@ -8,11 +8,23 @@ import { ReviewWithAnalysis } from "../types/review"
 type Props = {
   reviews: ReviewWithAnalysis[]
   canBulkActions?: boolean
+  historicalBacklogCount?: number
+  historicalBacklogLoaded?: boolean
+  loadingHistoricalBacklog?: boolean
+  onLoadHistoricalBacklog?: () => Promise<void> | void
 }
 
-export default function ReviewList({ reviews, canBulkActions = true }: Props) {
+export default function ReviewList({
+  reviews,
+  canBulkActions = true,
+  historicalBacklogCount = 0,
+  historicalBacklogLoaded = false,
+  loadingHistoricalBacklog = false,
+  onLoadHistoricalBacklog,
+}: Props) {
   const [localReviews, setLocalReviews] = useState<ReviewWithAnalysis[]>(reviews)
   const [isNeedsAttentionOpen, setIsNeedsAttentionOpen] = useState(true)
+  const [isBacklogOpen, setIsBacklogOpen] = useState(false)
   const [isDeletedOpen, setIsDeletedOpen] = useState(true)
   const [isPostedOpen, setIsPostedOpen] = useState(true)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -90,6 +102,7 @@ export default function ReviewList({ reviews, canBulkActions = true }: Props) {
 
     if (sentiment === "negative") score += 50
     if (rating <= 2) score += 40
+    if (review.needs_ai_reply && review.is_actionable && !status) score += 35
     if (status === "draft" || status === "failed" || status === "deleted") score += 30
 
     return score
@@ -100,8 +113,8 @@ export default function ReviewList({ reviews, canBulkActions = true }: Props) {
       const priorityDiff = priorityScore(b) - priorityScore(a)
       if (priorityDiff !== 0) return priorityDiff
 
-      const aTime = new Date(a.created_at).getTime()
-      const bTime = new Date(b.created_at).getTime()
+      const aTime = new Date(a.review_time ?? a.review_date ?? a.created_at).getTime()
+      const bTime = new Date(b.review_time ?? b.review_date ?? b.created_at).getTime()
 
       return bTime - aTime
     })
@@ -110,9 +123,15 @@ export default function ReviewList({ reviews, canBulkActions = true }: Props) {
   const needsAttention = useMemo(() => {
     return sortedReviews.filter((review) => {
       const status = review.latest_reply?.status
-      return status === "draft" || status === "failed"
+      return review.needs_ai_reply && review.is_actionable && (!status || status === "draft" || status === "failed")
     })
   }, [sortedReviews])
+
+  const backlog = useMemo(() => {
+    return sortedReviews.filter((review) => review.needs_ai_reply && !review.is_actionable)
+  }, [sortedReviews])
+
+  const visibleBacklogCount = historicalBacklogLoaded ? backlog.length : historicalBacklogCount
 
   const deletedReplies = useMemo(() => {
     return sortedReviews.filter((review) => review.latest_reply?.status === "deleted")
@@ -140,7 +159,7 @@ export default function ReviewList({ reviews, canBulkActions = true }: Props) {
   // auto-expand newly arriving cards
   useEffect(() => {
     setExpandedIds((prev) => {
-      const newIds = [...needsAttention, ...deletedReplies, ...posted]
+      const newIds = [...needsAttention, ...backlog, ...deletedReplies, ...posted]
         .filter((r) => !prev.has(r.id))
         .map((r) => r.id)
       if (newIds.length === 0) return prev
@@ -148,7 +167,7 @@ export default function ReviewList({ reviews, canBulkActions = true }: Props) {
       newIds.forEach((id) => next.add(id))
       return next
     })
-  }, [needsAttention, deletedReplies, posted])
+  }, [needsAttention, backlog, deletedReplies, posted])
 
   function handleMarkedPosted(reviewId: string, replyText: string, source: "ai" | "user" | "system") {
     setLocalReviews((prev) =>
@@ -550,6 +569,50 @@ export default function ReviewList({ reviews, canBulkActions = true }: Props) {
     )
   }
 
+  function renderBacklog() {
+    if (!historicalBacklogLoaded) {
+      return (
+        <div style={{
+          borderRadius: 12, border: "1.5px dashed #c4b5fd",
+          backgroundColor: "#f5f3ff", padding: 32,
+          textAlign: "center", fontSize: 14, color: "#6d28d9",
+        }}>
+          {loadingHistoricalBacklog
+            ? "Loading historical backlog..."
+            : "Expand this section to load historical backlog reviews."}
+        </div>
+      )
+    }
+
+    if (backlog.length === 0) {
+      return (
+        <div style={{
+          borderRadius: 12, border: "1.5px dashed #c4b5fd",
+          backgroundColor: "#f5f3ff", padding: 32,
+          textAlign: "center", fontSize: 14, color: "#6d28d9",
+        }}>
+          No historical backlog reviews.
+        </div>
+      )
+    }
+
+    return (
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+        {backlog.map((review) => (
+          <ReviewCard
+            key={review.id}
+            review={review}
+            mode="needs-attention"
+            isExpanded={expandedIds.has(review.id)}
+            onToggleExpand={memoizedToggleExpand}
+            onMarkedPosted={memoizedHandleMarkedPosted}
+            onReplyChanged={memoizedHandleReplyChanged}
+          />
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div style={{ borderRadius: 24, border: "1px solid #e2e8f0", backgroundColor: "#ffffff", boxShadow: "0 1px 6px rgba(0,0,0,0.07)" }}>
       {/* ── toolbar ─────────────────────────────────────────────────────── */}
@@ -768,6 +831,48 @@ export default function ReviewList({ reviews, canBulkActions = true }: Props) {
           </div>
 
           {isPostedOpen && renderPosted()}
+        </section>
+
+        <section style={{ borderTop: "2px solid #f1f5f9", paddingTop: 32, marginBottom: 32 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+            <button
+              type="button"
+              onClick={() => {
+                const nextOpen = !isBacklogOpen
+                setIsBacklogOpen(nextOpen)
+
+                if (nextOpen && !historicalBacklogLoaded && visibleBacklogCount > 0) {
+                  onLoadHistoricalBacklog?.()
+                }
+              }}
+              style={{
+                flex: 1, display: "flex", alignItems: "center",
+                justifyContent: "space-between", padding: "12px 16px",
+                borderRadius: 12, cursor: "pointer", textAlign: "left",
+                backgroundColor: "#f5f3ff", border: "2px solid #8b5cf6",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                  backgroundColor: "#8b5cf6", display: "flex",
+                  alignItems: "center", justifyContent: "center",
+                  fontSize: 16, fontWeight: 700, color: "#ffffff",
+                }}>
+                  H
+                </div>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#5b21b6" }}>
+                  Historical backlog ({visibleBacklogCount})
+                </span>
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#7c3aed" }}>
+                {isBacklogOpen ? "▼ Hide" : "▶ Show"}
+              </span>
+            </button>
+          </div>
+
+          {isBacklogOpen && renderBacklog()}
         </section>
 
         {/* Deleted section */}

@@ -19,18 +19,26 @@ export default function Dashboard() {
   const [businesses, setBusinesses] = useState<Array<{ id: string; name: string | null }>>([])
   const [selectedBusinessId, setSelectedBusinessId] = useState<string>("")
   const [loading, setLoading] = useState(false)
+  const [historicalBacklogCount, setHistoricalBacklogCount] = useState(0)
+  const [historicalBacklogLoaded, setHistoricalBacklogLoaded] = useState(false)
+  const [loadingHistoricalBacklog, setLoadingHistoricalBacklog] = useState(false)
 
   const reviewsNeedingAttention =
     reviews.filter((review) => {
       const status = review.latest_reply?.status
-      return status === "draft" || status === "failed" || status === "deleted"
+      return review.needs_ai_reply && review.is_actionable && (!status || status === "draft" || status === "failed" || status === "deleted")
     }).length
+
+  const backlogReviews = historicalBacklogCount
 
   const postedReviews =
     reviews.filter((review) => review.latest_reply?.status === "posted").length
 
   const noReplyReviews =
-    reviews.filter((review) => !review.latest_reply).length
+    reviews.filter((review) => review.is_actionable && !review.latest_reply).length
+
+  const activeReviewBase =
+    reviews.filter((review) => review.is_actionable || Boolean(review.latest_reply)).length
 
   const averageRating =
     reviews.length > 0
@@ -41,13 +49,13 @@ export default function Dashboard() {
       : "—"
 
   const replyCoverage =
-    reviews.length > 0
-      ? Math.round(((reviews.length - noReplyReviews) / reviews.length) * 100)
+    activeReviewBase > 0
+      ? Math.round(((activeReviewBase - noReplyReviews) / activeReviewBase) * 100)
       : 0
 
   const canBulkActions = hasFeature(subscription.plan, "bulkActions")
 
-  const loadReviews = useCallback(async (businessId?: string) => {
+  const loadReviews = useCallback(async (businessId?: string, includeHistoricalBacklog = false) => {
 
     setLoading(true)
 
@@ -74,7 +82,10 @@ export default function Dashboard() {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ businessId: businessId || undefined })
+      body: JSON.stringify({
+        businessId: businessId || undefined,
+        includeHistoricalBacklog,
+      })
     })
 
     const data = await res.json()
@@ -91,12 +102,20 @@ export default function Dashboard() {
       setHasBusiness(false)
       setBusinesses([])
       setReviews([])
+      setHistoricalBacklogCount(0)
+      setHistoricalBacklogLoaded(false)
       setLoading(false)
       return
     }
 
     setHasBusiness(true)
     setBusinesses(nextBusinesses)
+    setHistoricalBacklogCount(Number(data?.historicalBacklogCount ?? 0))
+    if (!includeHistoricalBacklog) {
+      setHistoricalBacklogLoaded(false)
+    } else {
+      setHistoricalBacklogLoaded(true)
+    }
     if (data?.selectedBusinessId) {
       setSelectedBusinessId((prev) => (prev === data.selectedBusinessId ? prev : data.selectedBusinessId))
     }
@@ -104,9 +123,22 @@ export default function Dashboard() {
     setLoading(false)
   }, [])
 
+  const loadHistoricalBacklog = useCallback(async () => {
+    if (historicalBacklogLoaded || loadingHistoricalBacklog) {
+      return
+    }
+
+    setLoadingHistoricalBacklog(true)
+    try {
+      await loadReviews(selectedBusinessId || undefined, true)
+    } finally {
+      setLoadingHistoricalBacklog(false)
+    }
+  }, [historicalBacklogLoaded, loadingHistoricalBacklog, loadReviews, selectedBusinessId])
+
   useEffect(() => {
     const run = async () => {
-      await loadReviews(selectedBusinessId || undefined)
+      await loadReviews(selectedBusinessId || undefined, false)
     }
 
     run()
@@ -190,7 +222,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* 4 stat cards */}
+            {/* stat cards */}
             <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
 
               {/* Total */}
@@ -216,6 +248,18 @@ export default function Dashboard() {
                 </p>
                 <p style={{ fontSize: 28, fontWeight: 800, color: "#78350f", margin: "8px 0 0" }}>
                   {reviewsNeedingAttention}
+                </p>
+              </div>
+
+              <div style={{
+                borderRadius: 14, border: "1.5px solid #c4b5fd",
+                backgroundColor: "#f5f3ff", padding: "16px 20px",
+              }}>
+                <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#6d28d9", margin: 0 }}>
+                  Historical backlog
+                </p>
+                <p style={{ fontSize: 28, fontWeight: 800, color: "#5b21b6", margin: "8px 0 0" }}>
+                  {backlogReviews}
                 </p>
               </div>
 
@@ -291,7 +335,14 @@ export default function Dashboard() {
           </div>
         )}
 
-        <ReviewList reviews={reviews} canBulkActions={canBulkActions} />
+        <ReviewList
+          reviews={reviews}
+          canBulkActions={canBulkActions}
+          historicalBacklogCount={historicalBacklogCount}
+          historicalBacklogLoaded={historicalBacklogLoaded}
+          loadingHistoricalBacklog={loadingHistoricalBacklog}
+          onLoadHistoricalBacklog={loadHistoricalBacklog}
+        />
 
       </div>
     </div>

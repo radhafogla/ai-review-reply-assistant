@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
   logApiRequest({ requestId, endpoint, userId });
 
   const body = await req.json().catch(() => ({}));
+  const includeHistoricalBacklog = body?.includeHistoricalBacklog === true;
   const requestedBusinessId =
     typeof body?.businessId === "string" && body.businessId.trim().length > 0
       ? body.businessId.trim()
@@ -92,16 +93,38 @@ export async function POST(req: NextRequest) {
     message: "Selected business for reviews fetch",
     businessCount: businesses.length,
     selectedBusinessId,
+    includeHistoricalBacklog,
   });
 
-  const { data: reviews, error } = await supabase
+  const { count: historicalBacklogCount, error: backlogCountError } = await supabase
+    .from("reviews")
+    .select("id", { count: "exact", head: true })
+    .eq("business_id", selectedBusinessId)
+    .eq("needs_ai_reply", true)
+    .eq("is_actionable", false);
+
+  if (backlogCountError) {
+    logApiError({
+      requestId,
+      endpoint,
+      userId,
+      status: 500,
+      message: "Failed counting historical backlog",
+      error: backlogCountError,
+      selectedBusinessId,
+    });
+  }
+
+  let reviewsQuery = supabase
     .from("reviews")
     .select(`
     id,
     author_name,
     rating,
     review_text,
-    review_date,
+    review_time,
+    needs_ai_reply,
+    is_actionable,
     latest_reply:review_replies!reviews_latest_reply_id_fkey (
       id,
       reply_text,
@@ -110,8 +133,13 @@ export async function POST(req: NextRequest) {
       created_at
     )
   `)
-    .eq("business_id", selectedBusinessId)
-    .order("review_date", { ascending: false });
+    .eq("business_id", selectedBusinessId);
+
+  if (!includeHistoricalBacklog) {
+    reviewsQuery = reviewsQuery.or("is_actionable.eq.true,needs_ai_reply.eq.false");
+  }
+
+  const { data: reviews, error } = await reviewsQuery.order("review_time", { ascending: false });
 
   if (error) {
     logApiError({
@@ -131,7 +159,15 @@ export async function POST(req: NextRequest) {
     message: "Fetched reviews",
     selectedBusinessId,
     reviewCount: reviews?.length ?? 0,
+    historicalBacklogCount: historicalBacklogCount ?? 0,
+    includeHistoricalBacklog,
   });
 
-  return NextResponse.json({ reviews: reviews ?? [], businesses, selectedBusinessId });
+  return NextResponse.json({
+    reviews: reviews ?? [],
+    businesses,
+    selectedBusinessId,
+    historicalBacklogCount: historicalBacklogCount ?? 0,
+    includeHistoricalBacklog,
+  });
 }

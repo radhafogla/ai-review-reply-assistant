@@ -43,13 +43,16 @@ SET default_table_access_method = "heap";
 CREATE TABLE IF NOT EXISTS "public"."businesses" (
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
     "user_id" "uuid" NOT NULL,
-    "google_location_id" "text" NOT NULL,
+    "location_id" "text" NOT NULL,
     "name" "text" NOT NULL,
     "address" "text",
     "phone" "text",
     "connected_at" timestamp with time zone DEFAULT "now"(),
     "account_id" "text",
-    "updated_at" timestamp with time zone DEFAULT "now"()
+    "updated_at" timestamp with time zone DEFAULT "now"(),
+    "last_synced_at" timestamp with time zone,
+    "sync_status" "text" DEFAULT 'pending'::"text",
+    "sync_error" "text"
 );
 
 
@@ -122,14 +125,18 @@ ALTER TABLE "public"."review_replies" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."reviews" (
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
     "business_id" "uuid" NOT NULL,
-    "google_review_id" "text",
+    "review_id" "text" NOT NULL,
     "author_name" "text",
     "rating" integer,
     "review_text" "text",
-    "review_date" timestamp with time zone,
+    "review_time" timestamp with time zone,
     "created_at" timestamp with time zone DEFAULT "now"(),
     "latest_reply_id" "uuid",
-    "updated_at" timestamp with time zone DEFAULT "now"()
+    "updated_at" timestamp with time zone DEFAULT "now"(),
+    "needs_ai_reply" boolean DEFAULT true,
+    "is_actionable" boolean DEFAULT true,
+    "last_ai_attempt_at" timestamp with time zone,
+    "ai_reply_attempts" integer DEFAULT 0
 );
 
 
@@ -209,12 +216,12 @@ ALTER TABLE ONLY "public"."review_replies"
 
 
 ALTER TABLE ONLY "public"."reviews"
-    ADD CONSTRAINT "reviews_google_review_id_key" UNIQUE ("google_review_id");
+    ADD CONSTRAINT "reviews_pkey" PRIMARY KEY ("id");
 
 
 
 ALTER TABLE ONLY "public"."reviews"
-    ADD CONSTRAINT "reviews_pkey" PRIMARY KEY ("id");
+    ADD CONSTRAINT "reviews_review_id_key" UNIQUE ("review_id");
 
 
 
@@ -251,15 +258,15 @@ CREATE INDEX "idx_reviews_business" ON "public"."reviews" USING "btree" ("busine
 
 
 
-CREATE INDEX "idx_reviews_date" ON "public"."reviews" USING "btree" ("review_date" DESC);
-
-
-
 CREATE INDEX "idx_reviews_rating" ON "public"."reviews" USING "btree" ("rating");
 
 
 
 CREATE INDEX "idx_reviews_reply" ON "public"."reviews" USING "btree" ("latest_reply_id");
+
+
+
+CREATE INDEX "idx_reviews_time" ON "public"."reviews" USING "btree" ("review_time" DESC);
 
 
 
@@ -515,7 +522,6 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."users" TO "authenticated";
 
 
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL ON SEQUENCES FROM "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "service_role";
 
@@ -525,7 +531,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQ
 
 
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL ON FUNCTIONS FROM "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS TO "service_role";
 
@@ -535,7 +540,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUN
 
 
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL ON TABLES FROM "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
 

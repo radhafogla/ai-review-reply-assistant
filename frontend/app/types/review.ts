@@ -5,8 +5,10 @@ export interface Review {
     rating: number;
     review_text: string;
     created_at: string;
-    review_date: string;
-  review_time?: string;
+    review_date?: string;
+    review_time?: string;
+    needs_ai_reply?: boolean;
+    is_actionable?: boolean;
     latest_reply_id?: string;
     latest_reply?: ReviewReply
 }

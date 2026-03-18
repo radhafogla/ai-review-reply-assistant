@@ -2,7 +2,6 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { createServerClient } from "@/lib/supabaseServerClient"
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
-import { trackUsageEvent } from "@/lib/usageTracking"
 
 export async function POST(req: NextRequest) {
   const endpoint = "/api/delete-reply"
@@ -37,11 +36,11 @@ export async function POST(req: NextRequest) {
     .from("reviews")
     .select(`
       id,
-      google_review_id,
+      review_id,
       latest_reply_id,
       businesses (
         account_id,
-        google_location_id
+        location_id
       ),
       latest_reply:review_replies!reviews_latest_reply_id_fkey (
         id,
@@ -61,7 +60,7 @@ export async function POST(req: NextRequest) {
   const business = Array.isArray(review.businesses) ? review.businesses[0] : review.businesses
   const latestReply = Array.isArray(review.latest_reply) ? review.latest_reply[0] : review.latest_reply
 
-  if (!business?.account_id || !business?.google_location_id || !review.google_review_id) {
+  if (!business?.account_id || !business?.location_id || !review.review_id) {
     return NextResponse.json({ error: "Review is missing Google mapping" }, { status: 400 })
   }
 
@@ -69,7 +68,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Only posted replies can be deleted" }, { status: 400 })
   }
 
-  const url = `https://mybusiness.googleapis.com/v4/accounts/${business.account_id}/locations/${business.google_location_id}/reviews/${review.google_review_id}/reply`
+  const url = `https://mybusiness.googleapis.com/v4/accounts/${business.account_id}/locations/${business.location_id}/reviews/${review.review_id}/reply`
 
   const googleRes = await fetch(url, {
     method: "DELETE",

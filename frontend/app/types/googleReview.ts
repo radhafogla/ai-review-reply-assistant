@@ -2,6 +2,12 @@ export interface GoogleReviewer {
   displayName?: string
 }
 
+export interface GoogleReply {
+  comment?: string
+  createTime?: string
+  updateTime?: string
+}
+
 export interface GoogleReview {
   reviewId: string
   reviewer: GoogleReviewer
@@ -9,6 +15,7 @@ export interface GoogleReview {
   comment?: string
   createTime: string
   updateTime?: string
+  reply?: GoogleReply
 }
 
 export interface GoogleReviewListResponse {

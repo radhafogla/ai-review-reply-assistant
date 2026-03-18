@@ -12,6 +12,8 @@ interface StoredReview {
   rating: number | null
   review_text: string | null
   review_time: string | null
+  needs_ai_reply: boolean | null
+  is_actionable: boolean | null
 }
 
 interface FormattedReview {
@@ -21,8 +23,11 @@ interface FormattedReview {
   rating: number
   review_text: string
   review_time: string
-  synced_at: string
+  needs_ai_reply: boolean
+  is_actionable: boolean
 }
+
+const ACTIONABLE_REVIEW_WINDOW_DAYS = 30
 
 const STAR_RATING_TO_NUMBER: Record<string, number> = {
   ONE: 1,
@@ -56,19 +61,38 @@ function toTimestamp(value?: string | null): number {
   return Number.isNaN(timestamp) ? 0 : timestamp
 }
 
+function isWithinActionWindow(reviewTime: string, nowIso: string): boolean {
+  const reviewTimestamp = toTimestamp(reviewTime)
+
+  if (reviewTimestamp === 0) {
+    return true
+  }
+
+  const nowTimestamp = toTimestamp(nowIso)
+  const maxAgeMs = ACTIONABLE_REVIEW_WINDOW_DAYS * 24 * 60 * 60 * 1000
+
+  return nowTimestamp - reviewTimestamp <= maxAgeMs
+}
+
 function normalizeReview(
   review: GoogleReview,
   businessId: string,
   syncedAt: string
 ): FormattedReview {
+  const hasAdminReply = review.reply && review.reply.comment
+  const reviewTime = review.updateTime ?? review.createTime
+  const needsAiReply = !hasAdminReply
+  const isActionable = needsAiReply && isWithinActionWindow(reviewTime, syncedAt)
+  
   return {
     business_id: businessId,
     review_id: review.reviewId,
     author_name: review.reviewer?.displayName ?? "Anonymous",
     rating: normalizeStarRating(review.starRating),
     review_text: review.comment ?? "",
-    review_time: review.updateTime ?? review.createTime,
-    synced_at: syncedAt
+    review_time: reviewTime,
+    needs_ai_reply: needsAiReply,
+    is_actionable: isActionable
   }
 }
 
@@ -84,7 +108,9 @@ function shouldUpsert(
     existingReview.author_name !== nextReview.author_name ||
     existingReview.rating !== nextReview.rating ||
     existingReview.review_text !== nextReview.review_text ||
-    existingReview.review_time !== nextReview.review_time
+    existingReview.review_time !== nextReview.review_time ||
+    existingReview.needs_ai_reply !== nextReview.needs_ai_reply ||
+    existingReview.is_actionable !== nextReview.is_actionable
   )
 }
 
@@ -182,7 +208,7 @@ export async function POST(req: NextRequest) {
 
   const { data: existingReviews, error: existingReviewsError } = await supabase
     .from("reviews")
-    .select("review_id, author_name, rating, review_text, review_time")
+    .select("review_id, author_name, rating, review_text, review_time, needs_ai_reply, is_actionable")
     .eq("business_id", business.id)
 
   if (existingReviewsError) {
@@ -252,12 +278,32 @@ export async function POST(req: NextRequest) {
           businessId: business.id,
         })
 
+        // Update sync status to failed
+        await serviceSupabase
+          .from("businesses")
+          .update({
+            sync_status: "failed",
+            sync_error: insertError.message
+          })
+          .eq("id", business.id)
+
         return NextResponse.json(
           { error: "Failed to save reviews" },
           { status: 500 }
         )
       }
     }
+
+    // Mark sync as successful
+    const serviceSupabase = createServiceClient()
+    await serviceSupabase
+      .from("businesses")
+      .update({
+        last_synced_at: new Date().toISOString(),
+        sync_status: "success",
+        sync_error: null
+      })
+      .eq("id", business.id)
 
     await trackUsageEvent({
       requestId,
@@ -269,6 +315,8 @@ export async function POST(req: NextRequest) {
         fetchedCount: dedupedReviews.length,
         upsertedCount: reviewsToUpsert.length,
         skippedCount: formattedReviews.length - reviewsToUpsert.length,
+        actionableCount: formattedReviews.filter((review) => review.is_actionable).length,
+        backlogCount: formattedReviews.filter((review) => review.needs_ai_reply && !review.is_actionable).length,
         syncMode: latestKnownTimestamp > 0 ? "incremental" : "initial",
       },
     })
@@ -278,6 +326,8 @@ export async function POST(req: NextRequest) {
       fetchedCount: dedupedReviews.length,
       upsertedCount: reviewsToUpsert.length,
       skippedCount: formattedReviews.length - reviewsToUpsert.length,
+      actionableCount: formattedReviews.filter((review) => review.is_actionable).length,
+      backlogCount: formattedReviews.filter((review) => review.needs_ai_reply && !review.is_actionable).length,
       syncMode: latestKnownTimestamp > 0 ? "incremental" : "initial"
     })
   } catch (error) {
@@ -290,6 +340,17 @@ export async function POST(req: NextRequest) {
       error,
       businessId: business.id,
     })
+
+    // Update sync status to failed
+    const serviceSupabase = createServiceClient()
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    await serviceSupabase
+      .from("businesses")
+      .update({
+        sync_status: "failed",
+        sync_error: errorMsg
+      })
+      .eq("id", business.id)
 
     return NextResponse.json(
       { error: "Failed to sync Google reviews" },

@@ -12,7 +12,6 @@ type ConnectedBusiness = {
   id: string
   name: string | null
   location_id?: string | null
-  google_location_id?: string | null
   account_id?: string | null
   connected_at?: string | null
 }
@@ -59,23 +58,13 @@ export default function ConnectBusiness() {
 
     const { data, error } = await supabase
       .from("businesses")
-      .select("id, name, account_id, connected_at, location_id, google_location_id")
+      .select("id, name, account_id, connected_at, location_id")
       .eq("user_id", uid)
       .order("connected_at", { ascending: false })
 
     if (error) {
-      // Fallback for schemas that don't include one of these columns.
-      const fallback = await supabase
-        .from("businesses")
-        .select("id, name")
-        .eq("user_id", uid)
-
-      if (fallback.error) {
-        console.error("Failed to load businesses", fallback.error)
-        setConnectedBusinesses([])
-      } else {
-        setConnectedBusinesses((fallback.data || []) as ConnectedBusiness[])
-      }
+      console.error("Failed to load businesses", error)
+      setConnectedBusinesses([])
     } else {
       setConnectedBusinesses((data || []) as ConnectedBusiness[])
     }
@@ -125,7 +114,7 @@ export default function ConnectBusiness() {
 
   const visibleLocations = useMemo(() => {
     const existingKeys = new Set(
-      connectedBusinesses.map((business) => business.location_id || business.google_location_id).filter(Boolean),
+      connectedBusinesses.map((business) => business.location_id).filter(Boolean),
     )
 
     return locations.filter((loc) => !existingKeys.has(loc.locationId))
@@ -307,7 +296,7 @@ export default function ConnectBusiness() {
                         {business.name || "Unnamed business"}
                       </td>
                       <td style={{ padding: "12px 14px", fontSize: 13, color: "#334155" }}>
-                        {business.location_id || business.google_location_id || "-"}
+                        {business.location_id || "-"}
                       </td>
                       <td style={{ padding: "12px 14px", fontSize: 13, color: "#334155" }}>
                         {business.connected_at ? new Date(business.connected_at).toLocaleString() : "-"}
