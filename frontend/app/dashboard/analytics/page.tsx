@@ -19,6 +19,12 @@ type AnalyticsPayload = {
     plan: string
     subscriptionStatus: string
   }
+  premium: {
+    autoReplyAttempted: number
+    autoReplyPosted: number
+    autoReplyFailed: number
+    autoReplySuccessRate: number
+  }
   charts: {
     ratings: Bucket[]
     replyStatuses: Bucket[]
@@ -197,6 +203,8 @@ export default function AnalyticsPage() {
   if (!hasBusiness) return <EmptyState />
 
   const totals = analytics?.totals
+  const premium = analytics?.premium
+  const isPremiumPlan = (totals?.plan || subscription.plan).toLowerCase() === "premium"
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc" }}>
@@ -271,6 +279,36 @@ export default function AnalyticsPage() {
                 <div style={{ fontSize: 24, fontWeight: 800, color: "#78350f", marginTop: 4 }}>{totals?.integrations ?? 0}</div>
               </div>
             </div>
+
+            {isPremiumPlan && (
+              <div style={{ marginTop: 16, borderRadius: 14, border: "1.5px solid #c7d2fe", backgroundColor: "#eef2ff", padding: "14px 16px" }}>
+                <div style={{ fontSize: 11, color: "#3730a3", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                  Premium auto-reply metrics
+                </div>
+
+                <div style={{ marginTop: 12, display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
+                  <div style={{ borderRadius: 10, backgroundColor: "#ffffff", border: "1px solid #e0e7ff", padding: "10px 12px" }}>
+                    <div style={{ fontSize: 11, color: "#4338ca", fontWeight: 700, textTransform: "uppercase" }}>Attempted</div>
+                    <div style={{ fontSize: 24, color: "#1e1b4b", fontWeight: 800 }}>{premium?.autoReplyAttempted ?? 0}</div>
+                  </div>
+
+                  <div style={{ borderRadius: 10, backgroundColor: "#ffffff", border: "1px solid #dcfce7", padding: "10px 12px" }}>
+                    <div style={{ fontSize: 11, color: "#166534", fontWeight: 700, textTransform: "uppercase" }}>Posted</div>
+                    <div style={{ fontSize: 24, color: "#14532d", fontWeight: 800 }}>{premium?.autoReplyPosted ?? 0}</div>
+                  </div>
+
+                  <div style={{ borderRadius: 10, backgroundColor: "#ffffff", border: "1px solid #fecaca", padding: "10px 12px" }}>
+                    <div style={{ fontSize: 11, color: "#b91c1c", fontWeight: 700, textTransform: "uppercase" }}>Failed</div>
+                    <div style={{ fontSize: 24, color: "#991b1b", fontWeight: 800 }}>{premium?.autoReplyFailed ?? 0}</div>
+                  </div>
+
+                  <div style={{ borderRadius: 10, backgroundColor: "#ffffff", border: "1px solid #bfdbfe", padding: "10px 12px" }}>
+                    <div style={{ fontSize: 11, color: "#1d4ed8", fontWeight: 700, textTransform: "uppercase" }}>Success rate</div>
+                    <div style={{ fontSize: 24, color: "#1e3a8a", fontWeight: 800 }}>{premium?.autoReplySuccessRate ?? 0}%</div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </section>
 

@@ -120,6 +120,32 @@ export async function POST(req: NextRequest) {
     .order("started_at", { ascending: false })
     .limit(1)
 
+  const { data: autoReplyEvents, error: autoReplyEventsError } = await supabase
+    .from("usage_events")
+    .select("event_type")
+    .eq("user_id", user.id)
+    .eq("business_id", selectedBusinessId)
+    .in("event_type", ["auto_reply_attempted", "auto_reply_posted", "auto_reply_failed"])
+
+  if (autoReplyEventsError) {
+    logApiError({ requestId, endpoint, userId: user.id, status: 500, message: "Failed to load auto-reply usage events", error: autoReplyEventsError.message })
+    return NextResponse.json({ error: "Failed to load auto-reply usage events", detail: autoReplyEventsError.message }, { status: 500 })
+  }
+
+  let autoReplyAttempted = 0
+  let autoReplyPosted = 0
+  let autoReplyFailed = 0
+
+  for (const event of autoReplyEvents ?? []) {
+    if (event.event_type === "auto_reply_attempted") autoReplyAttempted += 1
+    else if (event.event_type === "auto_reply_posted") autoReplyPosted += 1
+    else if (event.event_type === "auto_reply_failed") autoReplyFailed += 1
+  }
+
+  const autoReplySuccessRate = autoReplyAttempted > 0
+    ? Math.round((autoReplyPosted / autoReplyAttempted) * 100)
+    : 0
+
   const ratingCount = { "1★": 0, "2★": 0, "3★": 0, "4★": 0, "5★": 0 }
   for (const review of reviews ?? []) {
     const rating = Number(review.rating)
@@ -161,6 +187,12 @@ export async function POST(req: NextRequest) {
       integrations: integrations?.length ?? 0,
       plan: subscriptions?.[0]?.plan ?? resolvedPlan,
       subscriptionStatus: subscriptions?.[0]?.status ?? "active",
+    },
+    premium: {
+      autoReplyAttempted,
+      autoReplyPosted,
+      autoReplyFailed,
+      autoReplySuccessRate,
     },
     charts: {
       ratings: toBuckets(ratingCount),
