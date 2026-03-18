@@ -6,6 +6,7 @@ AI Review Reply Assistant is a Next.js application for connecting Google Busines
 
 - Connects one or more Google Business Profile locations to a user account
 - Supports both email/password authentication and Google OAuth sign-in
+- Includes a forgot-password flow with secure reset email links and in-app password update
 - Syncs Google reviews into Supabase
 - Generates draft replies with OpenAI
 - Lets users edit drafts before posting them
@@ -99,6 +100,7 @@ The app currently exposes 19 route handlers under [frontend/app/api](frontend/ap
 - Added server-side signup route at [frontend/app/api/auth/signup/route.ts](frontend/app/api/auth/signup/route.ts) using Supabase admin create-user flow with immediate account usability
 - Hardened user provisioning in [frontend/app/api/ensure-user/route.ts](frontend/app/api/ensure-user/route.ts) to better handle duplicate-email and initialization edge cases
 - Added smart post-auth routing so users with an existing business land on `/dashboard`, otherwise on `/connect-business`
+- Added forgot-password entry from login and a dedicated reset flow at `/reset-password`
 - Improved login card layout to reduce vertical scrolling and tighten top spacing
 
 All API routes use structured request/error logging through [frontend/lib/apiLogger.ts](frontend/lib/apiLogger.ts).

@@ -102,6 +102,12 @@ Login/signup improvements in frontend/app/login/page.tsx:
 - Added clearer spacing around primary and secondary auth actions
 - Navbar auth links now open the correct auth mode on the shared login page
 
+Forgot-password flow:
+- Login now includes a "Forgot password?" action that links to `/reset-password`
+- Reset requests use Supabase secure recovery email links
+- Recovery links land on `/reset-password` where users can set a new password
+- On successful reset, users are routed back to `/login?mode=login`
+
 ## API Surface Snapshot
 
 Current route handlers under frontend/app/api: 21
@@ -144,12 +150,12 @@ Notes:
 - Premium auto-reply settings with default-off behavior
 - Premium analytics card for auto-reply attempted/posted/failed/success-rate metrics
 - Login card layout and spacing refinements
+- Forgot-password and reset-password flow implementation
 - README updates to reflect the current implementation state
 
 ## Suggested Next Milestones
 
 - Expand analytics depth beyond current KPI cards and pie charts
-- Add forgot-password and password reset UX
 - Add callback success/failure toast states for Google connection flow
 - Harden reliability around background automation and retry/failure workflows
 
@@ -157,6 +163,7 @@ Notes:
 
 - README.md
 - frontend/app/login/page.tsx
+- frontend/app/reset-password/page.tsx
 - frontend/app/api/auth/signup/route.ts
 - frontend/app/api/ensure-user/route.ts
 - frontend/lib/subscription.ts

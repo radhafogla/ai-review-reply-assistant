@@ -343,6 +343,18 @@ export default function LoginPage() {
             required
           />
 
+          {mode === "login" && (
+            <div className="-mt-1 text-right">
+              <button
+                type="button"
+                onClick={() => router.push("/reset-password")}
+                className="text-sm font-medium text-blue-700 transition hover:text-blue-600"
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
+
           {mode === "signup" && (
             <>
               <label className="block text-sm font-medium text-slate-700" htmlFor="confirmPassword">
