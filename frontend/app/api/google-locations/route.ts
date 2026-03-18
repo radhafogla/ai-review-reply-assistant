@@ -72,14 +72,24 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ locations })
 
   } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Unknown error"
+    const reconnectRequired = /no google token found|refresh token missing|failed to refresh google access token/i.test(errorMessage)
+
     logApiError({
       requestId,
       endpoint,
       userId: user.id,
-      status: 500,
+      status: reconnectRequired ? 409 : 500,
       message: "Failed to fetch Google locations",
       error: err,
     })
-    return NextResponse.json({ error: "Failed to fetch locations" }, { status: 500 })
+
+    return NextResponse.json(
+      {
+        error: reconnectRequired ? "Google connection required" : "Failed to fetch locations",
+        reconnectRequired,
+      },
+      { status: reconnectRequired ? 409 : 500 },
+    )
   }
 }

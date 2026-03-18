@@ -30,6 +30,7 @@ export default function ConnectBusiness() {
   const [loadingLocations, setLoadingLocations] = useState(false)
   const [savingBusinessId, setSavingBusinessId] = useState<string | null>(null)
   const [showAddPanel, setShowAddPanel] = useState(false)
+  const [connectNotice, setConnectNotice] = useState<string | null>(null)
 
   const loadSession = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -73,9 +74,10 @@ export default function ConnectBusiness() {
   }, [])
 
   const fetchLocations = useCallback(async () => {
-    if (!accessToken) return
+    if (!accessToken) return { reconnectRequired: false }
 
     setLoadingLocations(true)
+    setConnectNotice(null)
 
     try {
       const res = await fetch("/api/google-locations", {
@@ -87,11 +89,20 @@ export default function ConnectBusiness() {
       const data = await res.json()
       if (res.ok) {
         setLocations(Array.isArray(data.locations) ? data.locations : [])
+        return { reconnectRequired: false }
       } else {
         console.error("Failed to fetch locations", data)
+        if (data?.reconnectRequired) {
+          return { reconnectRequired: true }
+        }
+
+        setConnectNotice("Unable to load locations right now. Please try again.")
+        return { reconnectRequired: false }
       }
     } catch (err) {
       console.error("Error fetching locations", err)
+      setConnectNotice("Unable to load locations right now. Please try again.")
+      return { reconnectRequired: false }
     } finally {
       setLoadingLocations(false)
     }
@@ -151,7 +162,13 @@ export default function ConnectBusiness() {
   async function handleAddAnotherClick() {
     if (hasReachedPlanLimit) return
     setShowAddPanel(true)
-    await fetchLocations()
+    const { reconnectRequired } = await fetchLocations()
+
+    if (reconnectRequired) {
+      setConnectNotice("Please reconnect Google to load your available locations.")
+      setShowAddPanel(false)
+      await handleConnectGoogle()
+    }
   }
 
   async function handleSelectLocation(location: Location) {
@@ -251,7 +268,7 @@ export default function ConnectBusiness() {
                     cursor: "pointer",
                   }}
                 >
-                  Connect Google
+                  Connect or Reconnect Google
                 </button>
 
                 <button
@@ -285,6 +302,14 @@ export default function ConnectBusiness() {
                 >
                   Go to Subscriptions
                 </Link>
+              </div>
+            )}
+
+            {connectNotice && (
+              <div style={{ marginTop: 12, borderRadius: 10, border: "1px solid #bfdbfe", backgroundColor: "#eff6ff", padding: "10px 12px" }}>
+                <p style={{ margin: 0, fontSize: 13, color: "#1e3a8a", fontWeight: 600 }}>
+                  {connectNotice}
+                </p>
               </div>
             )}
           </div>
