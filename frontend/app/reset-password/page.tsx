@@ -3,9 +3,10 @@
 import { FormEvent, useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { useRouter, useSearchParams } from "next/navigation"
+import { Suspense } from "react"
 import { supabase } from "../../lib/supabaseClient"
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
@@ -256,5 +257,13 @@ export default function ResetPasswordPage() {
         </div>
       </motion.div>
     </motion.div>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">Loading...</div>}>
+      <ResetPasswordContent />
+    </Suspense>
   )
 }
