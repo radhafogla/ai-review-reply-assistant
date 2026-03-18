@@ -42,6 +42,20 @@ export default function LoginPage() {
     }
   }
 
+  const determineRedirect = async (userId: string) => {
+    const { data: businesses, error } = await supabase
+      .from("businesses")
+      .select("id")
+      .eq("user_id", userId)
+      .limit(1)
+
+    if (!error && businesses && businesses.length > 0) {
+      return "/dashboard"
+    }
+
+    return "/connect-business"
+  }
+
   const resetFeedback = () => {
     setAuthError(null)
     setAuthNotice(null)
@@ -108,7 +122,8 @@ export default function LoginPage() {
       return
     }
 
-    router.push("/connect-business")
+    const redirectPath = await determineRedirect(data.user?.id || "")
+    router.push(redirectPath)
   }
 
   const handlePasswordSignup = async (event: FormEvent<HTMLFormElement>) => {
@@ -179,7 +194,8 @@ export default function LoginPage() {
     }
 
     setIsSubmitting(false)
-    router.push("/connect-business")
+    const redirectPath = await determineRedirect(loginData.user?.id || "")
+    router.push(redirectPath)
   }
 
   return (
@@ -207,7 +223,7 @@ export default function LoginPage() {
 
       {/* Login card */}
       <motion.div
-        className="relative w-full max-w-md rounded-3xl border border-slate-300/80 bg-gradient-to-b from-white/95 to-slate-50/90 p-8 shadow-[0_12px_40px_-12px_rgba(15,23,42,0.28)] backdrop-blur md:p-10"
+        className="relative w-[90vw] max-w-[26rem] rounded-3xl border border-slate-300/80 bg-gradient-to-b from-white/95 to-slate-50/90 p-6 shadow-[0_12px_40px_-12px_rgba(15,23,42,0.28)] backdrop-blur md:max-w-[28rem] md:p-8"
         initial={{ opacity: 0, y: 20, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
