@@ -29,8 +29,8 @@ export default function Hero() {
               Feedback intelligence for growing teams
             </div>
 
-            <h1 className="mx-auto mb-4 max-w-4xl text-4xl font-black tracking-tight md:text-6xl md:leading-[1.05]" style={{ color: 'var(--neutral-900)' }}>
-              Turn customer feedback into your competitive edge.
+            <h1 className="mx-auto mb-4 max-w-4xl text-4xl font-black tracking-tight md:text-5xl md:leading-[1.05]" style={{ color: 'var(--neutral-900)' }}>
+              Turn Customer Feedback Into AI-Powered Insights and Growth
             </h1>
 
             <p className="mx-auto mb-8 max-w-2xl text-base leading-7 md:text-lg" style={{ color: 'var(--neutral-600)' }}>

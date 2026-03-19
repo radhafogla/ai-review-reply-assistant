@@ -47,6 +47,17 @@ type AnalyticsPayload = {
   }
 }
 
+type SentimentCache = {
+  sentiment_positive: number
+  sentiment_neutral: number
+  sentiment_negative: number
+  analyzed_review_count: number
+  analyzed_at: string
+  themes: Record<string, { count: number; mentions: string[] }>
+  suggestions: { focus_areas: string[]; strengths: string[] }
+  sentiment_trend_by_day: Record<string, { positive: number; neutral: number; negative: number }>
+}
+
 function PieChart({ title, data, palette }: { title: string; data: Bucket[]; palette: string[] }) {
   const total = data.reduce((sum, d) => sum + d.value, 0)
 
@@ -170,6 +181,9 @@ export default function AnalyticsPage() {
   const [rangePreset, setRangePreset] = useState<DateRangePreset>("30d")
   const [customStartDate, setCustomStartDate] = useState("")
   const [customEndDate, setCustomEndDate] = useState("")
+  const [sentimentCache, setSentimentCache] = useState<SentimentCache | null>(null)
+  const [sentimentLoading, setSentimentLoading] = useState(false)
+  const [isStale, setIsStale] = useState(false)
 
   const canUseAdvancedAnalytics = hasFeature(subscription.plan, "advancedAnalytics")
 
@@ -224,6 +238,69 @@ export default function AnalyticsPage() {
     setLoading(false)
   }, [])
 
+  const loadSentimentCache = useCallback(
+    async (businessId: string) => {
+      const { data: { session } } = await supabase.auth.getSession()
+      const accessToken = session?.access_token
+
+      if (!accessToken || !businessId) return
+
+      try {
+        const res = await fetch(`/api/sentiment-cache?businessId=${businessId}`, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        })
+
+        if (res.ok) {
+          const cache = (await res.json()) as SentimentCache
+          setSentimentCache(cache)
+
+          // Check staleness
+          if (analytics?.totals?.reviews && cache.analyzed_review_count) {
+            setIsStale(analytics.totals.reviews > cache.analyzed_review_count)
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load sentiment cache", err)
+      }
+    },
+    [analytics?.totals?.reviews]
+  )
+
+  const handleAnalyzeSentiment = useCallback(async (forceRefresh = false) => {
+    const { data: { session } } = await supabase.auth.getSession()
+    const accessToken = session?.access_token
+
+    if (!accessToken || !selectedBusinessId) return
+
+    setSentimentLoading(true)
+
+    try {
+      const res = await fetch("/api/analyze-reviews", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          businessId: selectedBusinessId,
+          forceRefresh
+        })
+      })
+
+      if (res.ok) {
+        const result = (await res.json()) as SentimentCache
+        setSentimentCache(result)
+        setIsStale(false)
+      } else {
+        console.error("Analysis failed", await res.json())
+      }
+    } catch (err) {
+      console.error("Failed to analyze reviews", err)
+    } finally {
+      setSentimentLoading(false)
+    }
+  }, [selectedBusinessId])
+
   useEffect(() => {
     if (subscriptionLoading) return
 
@@ -244,6 +321,12 @@ export default function AnalyticsPage() {
     }
     run()
   }, [selectedBusinessId, loadAnalytics, subscriptionLoading, canUseAdvancedAnalytics, rangePreset, customStartDate, customEndDate])
+
+  useEffect(() => {
+    if (selectedBusinessId && analytics?.totals?.reviews) {
+      loadSentimentCache(selectedBusinessId)
+    }
+  }, [selectedBusinessId, analytics?.totals?.reviews, loadSentimentCache])
 
   if (!hasBusiness) return <EmptyState />
 
@@ -404,12 +487,211 @@ export default function AnalyticsPage() {
           </div>
         </section>
 
+        {/* Sentiment Analysis Section */}
+        <section style={{ marginBottom: 20 }}>
+          <div style={{ marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 20, color: "#0f172a", fontWeight: 800 }}>Sentiment analysis</h2>
+              <p style={{ marginTop: 6, marginBottom: 0, color: "#64748b", fontSize: 13 }}>
+                AI-powered sentiment breakdown of all reviews
+              </p>
+            </div>
+
+            <button
+              onClick={() => handleAnalyzeSentiment(isStale)}
+              disabled={sentimentLoading}
+              style={{
+                padding: "10px 16px",
+                borderRadius: 10,
+                border: "1.5px solid #e2e8f0",
+                backgroundColor: sentimentLoading ? "#e2e8f0" : "#ffffff",
+                color: sentimentLoading ? "#94a3b8" : "#0f172a",
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: sentimentLoading ? "default" : "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              {sentimentLoading ? "Analyzing..." : isStale ? "Refresh Analysis" : sentimentCache ? "Re-analyze" : "Analyze Reviews"}
+            </button>
+          </div>
+
+          {isStale && sentimentCache && (
+            <div style={{
+              backgroundColor: "#fef3c7",
+              border: "1px solid #fcd34d",
+              borderRadius: 12,
+              padding: 12,
+              marginBottom: 14
+            }}>
+              <p style={{ margin: 0, fontSize: 13, color: "#92400e", fontWeight: 600 }}>
+                ⚠️ Last analyzed: {new Date(sentimentCache.analyzed_at).toLocaleString()}
+                <br />
+                {sentimentCache.analyzed_review_count} reviews analyzed, {(totals?.reviews ?? 0) - sentimentCache.analyzed_review_count} new reviews since then
+              </p>
+            </div>
+          )}
+
+          {!isStale && sentimentCache && (
+            <div style={{
+              backgroundColor: "#dcfce7",
+              border: "1px solid #86efac",
+              borderRadius: 12,
+              padding: 12,
+              marginBottom: 14,
+              fontSize: 13,
+              color: "#166534",
+              fontWeight: 600
+            }}>
+              ✓ Last analyzed: {new Date(sentimentCache.analyzed_at).toLocaleString()} ({sentimentCache.analyzed_review_count} reviews)
+            </div>
+          )}
+
+          {!sentimentCache && !sentimentLoading && (
+            <div style={{
+              backgroundColor: "#f0f9ff",
+              border: "1px solid #bfdbfe",
+              borderRadius: 12,
+              padding: 12,
+              marginBottom: 14,
+              fontSize: 13,
+              color: "#1e40af",
+              fontWeight: 600
+            }}>
+              Click "Analyze Reviews" to compute sentiment insights
+            </div>
+          )}
+        </section>
+
         <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))" }}>
-          <PieChart title="Ratings distribution" data={analytics?.charts.ratings ?? []} palette={["#f97316", "#fb923c", "#fdba74", "#fed7aa", "#ffedd5"]} />
-          <PieChart title="Reply status mix" data={analytics?.charts.replyStatuses ?? []} palette={["#3b82f6", "#22c55e", "#059669", "#ef4444", "#94a3b8"]} />
-          <PieChart title="Reply source mix" data={analytics?.charts.replySources ?? []} palette={["#6366f1", "#14b8a6", "#0ea5e9"]} />
-          <PieChart title="Sentiment breakdown" data={analytics?.charts.sentiment ?? []} palette={["#22c55e", "#f59e0b", "#ef4444"]} />
+          <PieChart
+            title="Ratings distribution"
+            data={analytics?.charts.ratings ?? []}
+            palette={["#f97316", "#fb923c", "#fdba74", "#fed7aa", "#ffedd5"]}
+          />
+          <PieChart
+            title="Reply status mix"
+            data={analytics?.charts.replyStatuses ?? []}
+            palette={["#3b82f6", "#22c55e", "#059669", "#ef4444", "#94a3b8"]}
+          />
+          <PieChart
+            title="Reply source mix"
+            data={analytics?.charts.replySources ?? []}
+            palette={["#6366f1", "#14b8a6", "#0ea5e9"]}
+          />
+          {sentimentCache && (
+            <PieChart
+              title="Sentiment breakdown"
+              data={[
+                { label: "Positive", value: sentimentCache.sentiment_positive },
+                { label: "Neutral", value: sentimentCache.sentiment_neutral },
+                { label: "Negative", value: sentimentCache.sentiment_negative }
+              ]}
+              palette={["#22c55e", "#f59e0b", "#ef4444"]}
+            />
+          )}
+          {!sentimentCache && (
+            <PieChart
+              title="Sentiment breakdown"
+              data={[]}
+              palette={["#22c55e", "#f59e0b", "#ef4444"]}
+            />
+          )}
         </div>
+
+        {/* Premium Sentiment Features */}
+        {canUseAdvancedAnalytics && sentimentCache && (
+          <section style={{ marginTop: 20 }}>
+            <div style={{ marginBottom: 14 }}>
+              <h2 style={{ margin: 0, fontSize: 20, color: "#0f172a", fontWeight: 800 }}>Premium insights</h2>
+              <p style={{ marginTop: 6, marginBottom: 0, color: "#64748b", fontSize: 13 }}>
+                Deep analysis: key themes, AI suggestions, and sentiment trends
+              </p>
+            </div>
+
+            <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
+              {/* Themes */}
+              {Object.keys(sentimentCache.themes ?? {}).length > 0 && (
+                <div style={{ borderRadius: 14, border: "1.5px solid #e2e8f0", backgroundColor: "#ffffff", padding: 16 }}>
+                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f172a" }}>Key themes</h3>
+                  <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+                    {Object.entries(sentimentCache.themes ?? {}).map(([theme, data]) => (
+                      <div key={theme} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                        <span style={{ fontSize: 13, color: "#334155", fontWeight: 600, textTransform: "capitalize" }}>
+                          {theme}
+                        </span>
+                        <span style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>
+                          {(data as any)?.count ?? 0} mentions
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Suggestions */}
+              {(sentimentCache.suggestions?.focus_areas?.length || 0) > 0 && (
+                <div style={{ borderRadius: 14, border: "1.5px solid #e2e8f0", backgroundColor: "#ffffff", padding: 16 }}>
+                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f172a" }}>AI suggestions</h3>
+
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ marginBottom: 12 }}>
+                      <p style={{ margin: 0, fontSize: 12, color: "#64748b", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                        Focus areas
+                      </p>
+                      <ul style={{ margin: "8px 0 0 0", paddingLeft: 20, color: "#334155", fontSize: 13, fontWeight: 500 }}>
+                        {(sentimentCache.suggestions?.focus_areas ?? []).map((area, idx) => (
+                          <li key={idx}>{area}</li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div>
+                      <p style={{ margin: 0, fontSize: 12, color: "#64748b", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                        Strengths
+                      </p>
+                      <ul style={{ margin: "8px 0 0 0", paddingLeft: 20, color: "#334155", fontSize: 13, fontWeight: 500 }}>
+                        {(sentimentCache.suggestions?.strengths ?? []).map((strength, idx) => (
+                          <li key={idx}>{strength}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Sentiment Trends */}
+            {Object.keys(sentimentCache.sentiment_trend_by_day ?? {}).length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f172a", marginBottom: 12 }}>
+                  Sentiment trends (30 days)
+                </h3>
+                <div style={{ borderRadius: 14, border: "1.5px solid #e2e8f0", backgroundColor: "#ffffff", padding: 16 }}>
+                  <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+                    {/* Positive trend */}
+                    <TrendBars
+                      title="Positive reviews by day"
+                      data={Object.entries(sentimentCache.sentiment_trend_by_day ?? {})
+                        .map(([date, counts]) => ({ label: date, value: (counts as any).positive ?? 0 }))
+                        .filter(b => new Date(b.label).getTime() >= Date.now() - 30 * 24 * 60 * 60 * 1000)}
+                      color="#22c55e"
+                    />
+
+                    {/* Negative trend */}
+                    <TrendBars
+                      title="Negative reviews by day"
+                      data={Object.entries(sentimentCache.sentiment_trend_by_day ?? {})
+                        .map(([date, counts]) => ({ label: date, value: (counts as any).negative ?? 0 }))
+                        .filter(b => new Date(b.label).getTime() >= Date.now() - 30 * 24 * 60 * 60 * 1000)}
+                      color="#ef4444"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
 
         {canUseAdvancedAnalytics && (
           <section style={{ marginTop: 20 }}>
