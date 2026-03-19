@@ -1,9 +1,16 @@
 "use client"
 
 import Link from "next/link"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
+import {
+  DEFAULT_REPLY_TONE,
+  REPLY_TONE_DESCRIPTIONS,
+  REPLY_TONE_LABELS,
+  REPLY_TONE_VALUES,
+  type ReplyTone,
+} from "@/lib/replyTone"
 
 type DeleteActionType = "data" | "account" | null
 type DeleteStepType = "initial" | "email" | "final"
@@ -17,6 +24,104 @@ export default function SettingsPage() {
   const [deletingType, setDeletingType] = useState<DeleteActionType>(null)
   const [userEmail, setUserEmail] = useState<string>("")
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [replyTone, setReplyTone] = useState<ReplyTone>(DEFAULT_REPLY_TONE)
+  const [toneLoading, setToneLoading] = useState(false)
+  const [toneSaving, setToneSaving] = useState(false)
+  const [toneSaveMessage, setToneSaveMessage] = useState<string | null>(null)
+  const [hasConnectedBusiness, setHasConnectedBusiness] = useState(true)
+
+  const getAccessToken = useCallback(async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    return session?.access_token ?? null
+  }, [])
+
+  const loadReplyTone = useCallback(async () => {
+    setToneLoading(true)
+    setToneSaveMessage(null)
+
+    try {
+      const token = await getAccessToken()
+
+      if (!token) {
+        return
+      }
+
+      const res = await fetch("/api/reply-tone", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (res.status === 404) {
+        setHasConnectedBusiness(false)
+        return
+      }
+
+      if (!res.ok) {
+        setToneSaveMessage("Failed to load brand voice settings.")
+        return
+      }
+
+      const data = (await res.json()) as { tone?: string }
+      const resolvedTone = REPLY_TONE_VALUES.includes(data.tone as ReplyTone)
+        ? (data.tone as ReplyTone)
+        : DEFAULT_REPLY_TONE
+
+      setHasConnectedBusiness(true)
+      setReplyTone(resolvedTone)
+    } catch (error) {
+      console.error("Load reply tone error:", error)
+      setToneSaveMessage("Failed to load brand voice settings.")
+    } finally {
+      setToneLoading(false)
+    }
+  }, [getAccessToken])
+
+  async function saveReplyTone() {
+    setToneSaving(true)
+    setToneSaveMessage(null)
+
+    try {
+      const token = await getAccessToken()
+
+      if (!token) {
+        setToneSaveMessage("Session expired. Please sign in again.")
+        return
+      }
+
+      const res = await fetch("/api/reply-tone", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ tone: replyTone }),
+      })
+
+      if (res.status === 404) {
+        setHasConnectedBusiness(false)
+        setToneSaveMessage("Connect a business first to set brand voice.")
+        return
+      }
+
+      if (!res.ok) {
+        setToneSaveMessage("Could not save brand voice. Please try again.")
+        return
+      }
+
+      setHasConnectedBusiness(true)
+      setToneSaveMessage("Brand voice saved. New AI replies will follow this style.")
+    } catch (error) {
+      console.error("Save reply tone error:", error)
+      setToneSaveMessage("Could not save brand voice. Please try again.")
+    } finally {
+      setToneSaving(false)
+    }
+  }
 
   useEffect(() => {
     async function loadSession() {
@@ -24,13 +129,14 @@ export default function SettingsPage() {
       if (data.session?.user?.email) {
         setUserEmail(data.session.user.email)
         setIsAuthenticated(true)
+        await loadReplyTone()
       } else {
         router.push("/login")
       }
     }
 
     loadSession()
-  }, [router])
+  }, [router, loadReplyTone])
 
   const handleDeleteData = async () => {
     setIsDeleting(true)
@@ -226,6 +332,111 @@ export default function SettingsPage() {
                     <p style={{ fontSize: 14, color: "#0f172a", margin: 0, wordBreak: "break-all" }}>
                       {userEmail || "Not available"}
                     </p>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    borderRadius: 14,
+                    border: "1.5px solid #e2e8f0",
+                    backgroundColor: "#ffffff",
+                    padding: "18px 20px",
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.1em",
+                      color: "#64748b",
+                      margin: "0 0 10px",
+                    }}
+                  >
+                    Brand Voice
+                  </p>
+                  <p style={{ fontSize: 13, color: "#334155", margin: "0 0 14px" }}>
+                    Choose the default tone for generated replies. This applies to manual and auto-generated AI drafts.
+                  </p>
+
+                  {!hasConnectedBusiness && (
+                    <p
+                      style={{
+                        fontSize: 13,
+                        color: "#b45309",
+                        backgroundColor: "#fffbeb",
+                        border: "1px solid #fcd34d",
+                        borderRadius: 10,
+                        padding: "10px 12px",
+                        margin: "0 0 12px",
+                      }}
+                    >
+                      Connect a business first to enable brand voice templates.
+                    </p>
+                  )}
+
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {REPLY_TONE_VALUES.map((toneOption) => {
+                      const selected = replyTone === toneOption
+                      return (
+                        <label
+                          key={toneOption}
+                          style={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 10,
+                            border: selected ? "1.5px solid #2563eb" : "1.5px solid #e2e8f0",
+                            backgroundColor: selected ? "#eff6ff" : "#f8fafc",
+                            borderRadius: 12,
+                            padding: "10px 12px",
+                            cursor: hasConnectedBusiness ? "pointer" : "not-allowed",
+                            opacity: hasConnectedBusiness ? 1 : 0.65,
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="reply-tone"
+                            value={toneOption}
+                            checked={selected}
+                            disabled={!hasConnectedBusiness || toneLoading || toneSaving}
+                            onChange={() => setReplyTone(toneOption)}
+                            style={{ marginTop: 2 }}
+                          />
+                          <span>
+                            <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                              {REPLY_TONE_LABELS[toneOption]}
+                            </span>
+                            <span style={{ display: "block", fontSize: 12, color: "#64748b", marginTop: 3 }}>
+                              {REPLY_TONE_DESCRIPTIONS[toneOption]}
+                            </span>
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+
+                  <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center" }}>
+                    <button
+                      onClick={saveReplyTone}
+                      disabled={!hasConnectedBusiness || toneLoading || toneSaving}
+                      style={{
+                        padding: "8px 14px",
+                        borderRadius: 10,
+                        backgroundColor: !hasConnectedBusiness || toneLoading || toneSaving ? "#cbd5e1" : "#2563eb",
+                        color: "#ffffff",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        border: "none",
+                        cursor: !hasConnectedBusiness || toneLoading || toneSaving ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      {toneSaving ? "Saving..." : toneLoading ? "Loading..." : "Save voice"}
+                    </button>
+                    {toneSaveMessage && (
+                      <p style={{ margin: 0, fontSize: 12, color: toneSaveMessage.includes("saved") ? "#166534" : "#b45309" }}>
+                        {toneSaveMessage}
+                      </p>
+                    )}
                   </div>
                 </div>
 

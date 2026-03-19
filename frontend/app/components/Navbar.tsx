@@ -5,7 +5,7 @@ import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { supabase } from "../../lib/supabaseClient"
 import { useSubscription } from "@/app/hooks/useSubscription"
-import { getPlanLabel, hasFeature } from "@/lib/subscription"
+import { getPlanLabel } from "@/lib/subscription"
 
 export default function Navbar() {
   const router = useRouter()

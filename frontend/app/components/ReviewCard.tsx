@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { ReviewWithAnalysis } from "../types/review"
+import { REPLY_TONE_LABELS, type ReplyTone } from "@/lib/replyTone"
 
 interface Props {
   review: ReviewWithAnalysis
@@ -46,6 +47,7 @@ export default function ReviewCard({
   onMarkedDeleted,
   onReplyChanged,
 }: Props) {
+  const [latestTone, setLatestTone] = useState<{ base: ReplyTone; effective: ReplyTone; adapted: boolean } | null>(null)
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [replyText, setReplyText] = useState(review.latest_reply?.reply_text ?? "")
   const [savedText, setSavedText] = useState(review.latest_reply?.reply_text ?? "")
@@ -147,6 +149,15 @@ export default function ReviewCard({
 
       if (data?.reply) {
         setReplyText(data.reply)
+        if (data?.tone?.base && data?.tone?.effective) {
+          setLatestTone({
+            base: data.tone.base,
+            effective: data.tone.effective,
+            adapted: Boolean(data.tone.adapted),
+          })
+        } else {
+          setLatestTone(null)
+        }
         onReplyChanged?.(review.id, data.reply, "draft")
         showActionMessage("success", "Reply generated.")
       }
@@ -290,6 +301,17 @@ export default function ReviewCard({
   const badgeColor = isDeleted ? "#9f1239" : isNA ? "#78350f" : "#14532d"
   const chevronColor = isDeleted ? "#e11d48" : isNA ? "#b45309" : "#059669"
   const statusLabel = isDeleted ? "Deleted" : isNA ? "Needs attention" : "Posted"
+
+  const persistedTone =
+    review.latest_reply?.tone_base && review.latest_reply?.tone_effective
+      ? {
+          base: review.latest_reply.tone_base as ReplyTone,
+          effective: review.latest_reply.tone_effective as ReplyTone,
+          adapted: Boolean(review.latest_reply.tone_adapted),
+        }
+      : null
+
+  const displayedTone = latestTone ?? persistedTone
 
   return (
     <div style={{
@@ -443,6 +465,26 @@ export default function ReviewCard({
                   {posting ? "Posting\u2026" : "Save and Post"}
                 </button>
 
+                {displayedTone && !isDeleted && (
+                  <span
+                    style={{
+                      marginLeft: 4,
+                      borderRadius: 999,
+                      padding: "6px 10px",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      alignSelf: "center",
+                      backgroundColor: "#ecfdf5",
+                      border: "1px solid #bbf7d0",
+                      color: "#14532d",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Tone: {REPLY_TONE_LABELS[displayedTone.effective]}
+                    {displayedTone.adapted ? ` (from ${REPLY_TONE_LABELS[displayedTone.base]})` : ""}
+                  </span>
+                )}
+
                 {actionMessage && (
                   <span
                     style={{
@@ -492,6 +534,26 @@ export default function ReviewCard({
                 >
                   {deleting ? "Deleting..." : "Delete Post"}
                 </button>
+
+                {displayedTone && (
+                  <span
+                    style={{
+                      marginLeft: 4,
+                      borderRadius: 999,
+                      padding: "6px 10px",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      alignSelf: "center",
+                      backgroundColor: "#ecfdf5",
+                      border: "1px solid #bbf7d0",
+                      color: "#14532d",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Tone: {REPLY_TONE_LABELS[displayedTone.effective]}
+                    {displayedTone.adapted ? ` (from ${REPLY_TONE_LABELS[displayedTone.base]})` : ""}
+                  </span>
+                )}
               </div>
             </>
           )}

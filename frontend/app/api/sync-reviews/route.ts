@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import OpenAI from "openai"
+import { Resend } from "resend"
 import { createServerClient, createServiceClient } from "@/lib/supabaseServerClient"
 import { getValidAccessToken } from "@/lib/googleAuth"
 import { GoogleReview, GoogleReviewListResponse } from "@/app/types/googleReview"
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
 import { trackUsageEvent } from "@/lib/usageTracking"
 import { PREMIUM_AUTO_REPLY_DEFAULT_MIN_RATING, hasFeature, normalizePlan } from "@/lib/subscription"
+import { getReplyTonePromptGuidance, normalizeReplyTone, resolveAdaptiveReplyTone, type ReplyTone } from "@/lib/replyTone"
 
 interface StoredReview {
   review_id: string
@@ -30,7 +32,9 @@ interface FormattedReview {
 }
 
 const ACTIONABLE_REVIEW_WINDOW_DAYS = 30
+const NEGATIVE_REVIEW_NOTIFICATION_THRESHOLD = 2
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
 const STAR_RATING_TO_NUMBER: Record<string, number> = {
   ONE: 1,
@@ -117,12 +121,103 @@ function shouldUpsert(
   )
 }
 
-async function generateAutoReply(review: FormattedReview) {
+function escapeHtml(text: string): string {
+  const map: Record<string, string> = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
+  }
+
+  return text.replace(/[&<>"']/g, (match) => map[match])
+}
+
+function trimReviewText(reviewText: string, maxLength = 180): string {
+  const normalized = reviewText.trim()
+
+  if (!normalized) {
+    return "(No written comment)"
+  }
+
+  if (normalized.length <= maxLength) {
+    return normalized
+  }
+
+  return `${normalized.slice(0, maxLength).trimEnd()}...`
+}
+
+async function sendNegativeReviewNotificationEmail({
+  toEmail,
+  businessName,
+  reviews,
+}: {
+  toEmail: string
+  businessName: string
+  reviews: FormattedReview[]
+}): Promise<{ sent: boolean; error?: string }> {
+  if (!resend) {
+    return { sent: false, error: "RESEND_API_KEY is not configured" }
+  }
+
+  const fromEmail = process.env.REVIEW_ALERT_FROM_EMAIL || "onboarding@resend.dev"
+
+  const reviewsHtml = reviews
+    .map((review) => {
+      const safeAuthor = escapeHtml(review.author_name || "Anonymous")
+      const safeExcerpt = escapeHtml(trimReviewText(review.review_text))
+      const safeWhen = escapeHtml(new Date(review.review_time).toLocaleString())
+
+      return `
+        <li style="margin-bottom: 14px;">
+          <p style="margin: 0 0 4px; font-size: 14px; font-weight: 700; color: #0f172a;">
+            ${review.rating}★ from ${safeAuthor}
+          </p>
+          <p style="margin: 0 0 4px; font-size: 13px; color: #475569;">${safeExcerpt}</p>
+          <p style="margin: 0; font-size: 12px; color: #94a3b8;">${safeWhen}</p>
+        </li>
+      `
+    })
+    .join("")
+
+  const subject =
+    reviews.length === 1
+      ? `New negative review for ${businessName}`
+      : `${reviews.length} new negative reviews for ${businessName}`
+
+  const result = await resend.emails.send({
+    from: fromEmail,
+    to: toEmail,
+    subject,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto;">
+        <h2 style="color: #0f172a; margin-bottom: 8px;">Negative review alert</h2>
+        <p style="color: #475569; font-size: 14px; margin: 0 0 16px;">
+          You have ${reviews.length} new negative review${reviews.length === 1 ? "" : "s"} for <strong>${escapeHtml(businessName)}</strong>.
+          Responding quickly can reduce churn risk and improve trust.
+        </p>
+        <ul style="padding-left: 18px; margin: 0 0 18px;">${reviewsHtml}</ul>
+        <p style="color: #64748b; font-size: 13px; margin: 0;">Open Revora to draft and post a response.</p>
+      </div>
+    `,
+  })
+
+  if (result.error) {
+    return { sent: false, error: result.error.message }
+  }
+
+  return { sent: true }
+}
+
+async function generateAutoReply(review: FormattedReview, tone: ReplyTone) {
+  const toneInstruction = getReplyTonePromptGuidance(tone)
+
   const prompt = `
 You are replying to a Google review as a business owner.
 
 Rating: ${review.rating} stars
 Review: "${review.review_text}"
+${toneInstruction}
 
 Write a professional and friendly reply under 80 words. You dont need to address/greet the user or add regards at the end. Just the message itself is good.
 `
@@ -216,7 +311,7 @@ export async function POST(req: NextRequest) {
 
   const { data: business, error: businessError } = await supabase
     .from("businesses")
-    .select("id, account_id, location_id")
+    .select("id, account_id, location_id, name, reply_tone")
     .eq("user_id", userId)
     .single()
 
@@ -234,6 +329,7 @@ export async function POST(req: NextRequest) {
     .maybeSingle()
 
   const userPlan = normalizePlan(userRow?.plan)
+  const replyTone = normalizeReplyTone(business.reply_tone)
   const autoReplyAvailable = hasFeature(userPlan, "premiumAutoReply")
   const autoReplyEnabled = autoReplyAvailable && Boolean(userRow?.premium_auto_reply_enabled)
   const autoReplyMinRating = Math.min(5, Math.max(1, Number(userRow?.premium_auto_reply_min_rating ?? PREMIUM_AUTO_REPLY_DEFAULT_MIN_RATING)))
@@ -290,12 +386,22 @@ export async function POST(req: NextRequest) {
     const reviewsToUpsert = formattedReviews.filter((review) =>
       shouldUpsert(existingByReviewId.get(review.review_id), review)
     )
+    const newNegativeReviews = formattedReviews.filter(
+      (review) =>
+        !existingByReviewId.has(review.review_id) &&
+        review.rating > 0 &&
+        review.rating <= NEGATIVE_REVIEW_NOTIFICATION_THRESHOLD,
+    )
 
     const autoReplyCandidates = autoReplyEnabled
       ? formattedReviews.filter(
           (review) => review.needs_ai_reply && review.is_actionable && review.rating >= autoReplyMinRating,
         )
       : []
+
+    let negativeReviewNotificationAttempted = false
+    let negativeReviewNotificationSent = false
+    let negativeReviewNotificationError: string | null = null
 
     if (reviewsToUpsert.length > 0) {
       const serviceSupabase = createServiceClient()
@@ -359,6 +465,56 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    if (newNegativeReviews.length > 0 && user.email) {
+      negativeReviewNotificationAttempted = true
+
+      const notifyResult = await sendNegativeReviewNotificationEmail({
+        toEmail: user.email,
+        businessName: business.name,
+        reviews: newNegativeReviews,
+      })
+
+      negativeReviewNotificationSent = notifyResult.sent
+      negativeReviewNotificationError = notifyResult.error ?? null
+
+      if (notifyResult.sent) {
+        await trackUsageEvent({
+          requestId,
+          endpoint,
+          eventType: "negative_review_notification_sent",
+          userId,
+          businessId: business.id,
+          metadata: {
+            count: newNegativeReviews.length,
+            maxRating: NEGATIVE_REVIEW_NOTIFICATION_THRESHOLD,
+          },
+        })
+      } else {
+        logApiError({
+          requestId,
+          endpoint,
+          userId,
+          status: 500,
+          message: "Failed sending negative review notification email",
+          error: notifyResult.error,
+          businessId: business.id,
+        })
+
+        await trackUsageEvent({
+          requestId,
+          endpoint,
+          eventType: "negative_review_notification_failed",
+          userId,
+          businessId: business.id,
+          metadata: {
+            count: newNegativeReviews.length,
+            maxRating: NEGATIVE_REVIEW_NOTIFICATION_THRESHOLD,
+            reason: notifyResult.error,
+          },
+        })
+      }
+    }
+
     let autoReplyAttempted = 0
     let autoReplyPosted = 0
     let autoReplyFailed = 0
@@ -372,12 +528,51 @@ export async function POST(req: NextRequest) {
         .in("review_id", reviewIdsForCandidates)
 
       const reviewIdByExternalId = new Map((reviewRows ?? []).map((row) => [row.review_id, row.id]))
+      const localReviewIds = (reviewRows ?? []).map((row) => row.id)
+      const { data: analysisRows, error: analysisLookupError } = localReviewIds.length
+        ? await serviceSupabase
+            .from("review_analysis")
+            .select("review_id, sentiment, created_at")
+            .in("review_id", localReviewIds)
+        : { data: [], error: null }
+
+      if (analysisLookupError) {
+        logApiError({
+          requestId,
+          endpoint,
+          userId,
+          status: 500,
+          message: "Failed to load review sentiment for adaptive tone",
+          error: analysisLookupError,
+          businessId: business.id,
+        })
+      }
+
+      const latestSentimentByReviewId = new Map<string, { sentiment: string | null; createdAt: number }>()
+
+      for (const analysis of analysisRows ?? []) {
+        const timestamp = analysis.created_at ? Date.parse(analysis.created_at) : 0
+        const current = latestSentimentByReviewId.get(analysis.review_id)
+
+        if (!current || timestamp >= current.createdAt) {
+          latestSentimentByReviewId.set(analysis.review_id, {
+            sentiment: analysis.sentiment,
+            createdAt: Number.isNaN(timestamp) ? 0 : timestamp,
+          })
+        }
+      }
 
       for (const candidate of autoReplyCandidates) {
         const localReviewId = reviewIdByExternalId.get(candidate.review_id)
         if (!localReviewId) {
           continue
         }
+
+        const effectiveTone = resolveAdaptiveReplyTone({
+          baseTone: replyTone,
+          sentiment: latestSentimentByReviewId.get(localReviewId)?.sentiment,
+          rating: candidate.rating,
+        })
 
         autoReplyAttempted += 1
         await trackUsageEvent({
@@ -391,7 +586,7 @@ export async function POST(req: NextRequest) {
         })
 
         try {
-          const replyText = await generateAutoReply(candidate)
+          const replyText = await generateAutoReply(candidate, effectiveTone)
 
           if (!replyText) {
             throw new Error("Generated auto-reply was empty")
@@ -419,6 +614,9 @@ export async function POST(req: NextRequest) {
               review_id: localReviewId,
               user_id: userId,
               reply_text: replyText,
+              tone_base: replyTone,
+              tone_effective: effectiveTone,
+              tone_adapted: effectiveTone !== replyTone,
               source: "system",
               status: "posted",
               posted_at: new Date().toISOString(),
@@ -443,7 +641,7 @@ export async function POST(req: NextRequest) {
             eventType: "reply_generated",
             userId,
             reviewId: localReviewId,
-            metadata: { rating: candidate.rating, source: "system", mode: "premium_auto_reply" },
+            metadata: { rating: candidate.rating, source: "system", mode: "premium_auto_reply", tone: effectiveTone },
           })
 
           await trackUsageEvent({
@@ -501,6 +699,13 @@ export async function POST(req: NextRequest) {
         attempted: autoReplyAttempted,
         posted: autoReplyPosted,
         failed: autoReplyFailed,
+      },
+      negativeReviewNotification: {
+        attempted: negativeReviewNotificationAttempted,
+        sent: negativeReviewNotificationSent,
+        count: newNegativeReviews.length,
+        maxRating: NEGATIVE_REVIEW_NOTIFICATION_THRESHOLD,
+        error: negativeReviewNotificationError,
       },
     })
   } catch (error) {

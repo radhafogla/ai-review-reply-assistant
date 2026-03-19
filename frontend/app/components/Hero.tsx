@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link"
-import Image from "next/image"
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
 
@@ -35,7 +34,7 @@ export default function Hero() {
             </h1>
 
             <p className="mx-auto mb-8 max-w-2xl text-base leading-7 md:text-lg" style={{ color: 'var(--neutral-600)' }}>
-              Revora helps teams manage customer reviews with AI-powered replies, instant sentiment insights, and actionable trend detection in one streamlined workflow.
+              Revora helps teams manage customer reviews with AI-powered replies, brand voice templates, instant negative-review alerts, and actionable trend detection in one streamlined workflow.
             </p>
 
             <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -71,8 +70,8 @@ export default function Hero() {
                 <p className="mt-2 text-2xl font-black" style={{ color: 'var(--neutral-900)' }}>70% faster</p>
               </div>
               <div className="rounded-2xl bg-white/80 p-4" style={{ borderColor: 'var(--neutral-200)', borderWidth: '1px' }}>
-                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--neutral-500)' }}>Insight clarity</p>
-                <p className="mt-2 text-2xl font-black" style={{ color: 'var(--neutral-900)' }}>Instant</p>
+                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--neutral-500)' }}>Brand voice</p>
+                <p className="mt-2 text-2xl font-black" style={{ color: 'var(--neutral-900)' }}>Consistent</p>
               </div>
               <div className="rounded-2xl bg-white/80 p-4" style={{ borderColor: 'var(--neutral-200)', borderWidth: '1px' }}>
                 <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--neutral-500)' }}>Setup time</p>

@@ -128,6 +128,9 @@ export async function POST(req: NextRequest) {
     latest_reply:review_replies!reviews_latest_reply_id_fkey (
       id,
       reply_text,
+      tone_base,
+      tone_effective,
+      tone_adapted,
       status,
       source,
       created_at

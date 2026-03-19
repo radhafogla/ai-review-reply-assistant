@@ -4,6 +4,7 @@ import OpenAI from "openai";
 import { createServerClient, createServiceClient } from "@/lib/supabaseServerClient";
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger";
 import { trackUsageEvent } from "@/lib/usageTracking";
+import { getReplyTonePromptGuidance, normalizeReplyTone, resolveAdaptiveReplyTone } from "@/lib/replyTone";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -62,11 +63,46 @@ export async function POST(req: NextRequest) {
 
   const serviceSupabase = createServiceClient();
 
+  let baseTone = normalizeReplyTone(null);
+  let effectiveTone = baseTone;
+  let toneInstruction = getReplyTonePromptGuidance(effectiveTone);
+
+  const { data: reviewRow } = await supabase
+    .from("reviews")
+    .select("business_id")
+    .eq("id", reviewId)
+    .maybeSingle();
+
+  if (reviewRow?.business_id) {
+    const { data: businessRow } = await supabase
+      .from("businesses")
+      .select("reply_tone")
+      .eq("id", reviewRow.business_id)
+      .maybeSingle();
+
+    const { data: latestAnalysis } = await supabase
+      .from("review_analysis")
+      .select("sentiment")
+      .eq("review_id", reviewId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    baseTone = normalizeReplyTone(businessRow?.reply_tone);
+    effectiveTone = resolveAdaptiveReplyTone({
+      baseTone,
+      sentiment: latestAnalysis?.sentiment,
+      rating: Number(rating),
+    });
+    toneInstruction = getReplyTonePromptGuidance(effectiveTone);
+  }
+
   const prompt = `
 You are replying to a Google review as a business owner.
 
 Rating: ${rating} stars
 Review: "${review_text}"
+${toneInstruction}
 
 Write a professional and friendly reply under 80 words. You dont need to address/greet the user or add regards at the end. Just the message itself is good.
 `;
@@ -96,7 +132,12 @@ Write a professional and friendly reply under 80 words. You dont need to address
   if (latestDraftId) {
     const { data: updatedReply, error: updateError } = await supabase
       .from("review_replies")
-      .update({ reply_text: reply })
+      .update({
+        reply_text: reply,
+        tone_base: baseTone,
+        tone_effective: effectiveTone,
+        tone_adapted: effectiveTone !== baseTone,
+      })
       .eq("id", latestDraftId)
       .select("id")
       .single();
@@ -138,10 +179,17 @@ Write a professional and friendly reply under 80 words. You dont need to address
       eventType: "reply_generated",
       userId: user.id,
       reviewId,
-      metadata: { rating, source: "ai", mode: "update_existing_draft" },
+      metadata: { rating, source: "ai", mode: "update_existing_draft", tone: effectiveTone },
     })
 
-    return NextResponse.json({ reply });
+    return NextResponse.json({
+      reply,
+      tone: {
+        base: baseTone,
+        effective: effectiveTone,
+        adapted: effectiveTone !== baseTone,
+      },
+    });
   }
 
   const { data: insertedReply, error: insertError } = await supabase
@@ -150,6 +198,9 @@ Write a professional and friendly reply under 80 words. You dont need to address
       review_id: reviewId,
       user_id: user.id,
       reply_text: reply,
+      tone_base: baseTone,
+      tone_effective: effectiveTone,
+      tone_adapted: effectiveTone !== baseTone,
       source: "ai",
       status: "draft",
     })
@@ -193,8 +244,15 @@ Write a professional and friendly reply under 80 words. You dont need to address
     eventType: "reply_generated",
     userId: user.id,
     reviewId,
-    metadata: { rating, source: "ai", mode: "create_draft" },
+    metadata: { rating, source: "ai", mode: "create_draft", tone: effectiveTone },
   })
 
-  return NextResponse.json({ reply });
+  return NextResponse.json({
+    reply,
+    tone: {
+      base: baseTone,
+      effective: effectiveTone,
+      adapted: effectiveTone !== baseTone,
+    },
+  });
 }

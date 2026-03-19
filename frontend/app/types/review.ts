@@ -17,6 +17,9 @@ export interface ReviewReply {
   id: string
   review_id: string
   reply_text: string
+  tone_base?: string | null
+  tone_effective?: string | null
+  tone_adapted?: boolean | null
   source: "ai" | "user" | "system"
   status: "draft" | "approved" | "posted" | "failed" | "deleted"
   created_at: string

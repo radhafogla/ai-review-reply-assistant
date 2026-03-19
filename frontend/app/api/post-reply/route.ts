@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
 
   const { data: latestReply, error: latestReplyError } = await supabase
     .from("review_replies")
-    .select("id, reply_text, source, status")
+    .select("id, reply_text, source, status, tone_base, tone_effective, tone_adapted")
     .eq("review_id", reviewId)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -108,7 +108,13 @@ export async function POST(req: NextRequest) {
     ? latestReply.source
     : "user"
 
-  let persistedReply: { id: string; source: "ai" | "user" } | null = null
+  let persistedReply: {
+    id: string
+    source: "ai" | "user"
+    tone_base: string | null
+    tone_effective: string | null
+    tone_adapted: boolean | null
+  } | null = null
 
   if (latestReply && (latestReply.status === "draft" || latestReply.status === "failed")) {
     const { data: updatedReply, error: updateError } = await supabase
@@ -116,11 +122,14 @@ export async function POST(req: NextRequest) {
       .update({
         reply_text: replyText,
         source: persistedSource,
+        tone_base: persistedSource === "user" ? null : latestReply.tone_base,
+        tone_effective: persistedSource === "user" ? null : latestReply.tone_effective,
+        tone_adapted: persistedSource === "user" ? false : Boolean(latestReply.tone_adapted),
         status: "posted",
         posted_at: new Date().toISOString(),
       })
       .eq("id", latestReply.id)
-      .select("id, source")
+      .select("id, source, tone_base, tone_effective, tone_adapted")
       .single()
 
     if (updateError || !updatedReply) {
@@ -137,10 +146,13 @@ export async function POST(req: NextRequest) {
         user_id: user.id,
         reply_text: replyText,
         source: persistedSource,
+        tone_base: null,
+        tone_effective: null,
+        tone_adapted: false,
         status: "posted",
         posted_at: new Date().toISOString(),
       })
-      .select("id, source")
+      .select("id, source, tone_base, tone_effective, tone_adapted")
       .single()
 
     if (insertError || !insertedReply) {
@@ -172,6 +184,13 @@ export async function POST(req: NextRequest) {
       replyText,
       source: persistedReply.source,
       status: "posted",
+      tone: persistedReply.tone_effective
+        ? {
+            base: persistedReply.tone_base,
+            effective: persistedReply.tone_effective,
+            adapted: Boolean(persistedReply.tone_adapted),
+          }
+        : null,
     },
   });
 }

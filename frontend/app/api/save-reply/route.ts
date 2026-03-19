@@ -50,6 +50,9 @@ export async function POST(req: NextRequest) {
       .from("review_replies")
       .update({
         reply_text: replyText,
+        tone_base: null,
+        tone_effective: null,
+        tone_adapted: false,
         source: "user",
       })
       .eq("id", userDraft.id);
@@ -98,6 +101,9 @@ export async function POST(req: NextRequest) {
         .from("review_replies")
         .update({
           reply_text: replyText,
+          tone_base: null,
+          tone_effective: null,
+          tone_adapted: false,
           source: "user",
           status: "draft",
         })
@@ -132,6 +138,9 @@ export async function POST(req: NextRequest) {
           review_id: reviewId,
           user_id: user.id,
           reply_text: replyText,
+          tone_base: null,
+          tone_effective: null,
+          tone_adapted: false,
           source: "user",
           status: "draft",
         })

@@ -7,6 +7,8 @@ export type UsageEventType =
   | "auto_reply_posted"
   | "business_connected"
   | "limit_warning_shown"
+  | "negative_review_notification_failed"
+  | "negative_review_notification_sent"
   | "reply_deleted"
   | "reply_generated"
   | "reply_posted"

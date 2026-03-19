@@ -39,14 +39,14 @@ export default function Features() {
       status: "Live now",
     },
     {
-      title: "Theme Clusters",
-      desc: "Group recurring topics like service or pricing.",
-      status: "Coming soon",
+      title: "Brand Voice Templates",
+      desc: "Set reply tone to Professional, Friendly, or Apologetic and keep responses consistent.",
+      status: "Live now",
     },
     {
-      title: "Trend Watch",
-      desc: "Track what is improving and what is slipping.",
-      status: "Coming soon",
+      title: "Negative Review Alerts",
+      desc: "Get email alerts for new low-star reviews so your team can respond fast.",
+      status: "Live now",
     },
     {
       title: "Action Coach",
@@ -83,7 +83,7 @@ export default function Features() {
     },
     {
       title: "Respond",
-      desc: "Create polished replies in seconds, then edit and publish with full control.",
+      desc: "Create polished replies in seconds with your selected brand voice, then edit and publish with full control.",
     },
     {
       title: "Understand",
@@ -109,7 +109,7 @@ export default function Features() {
           </h2>
 
           <p className="mx-auto max-w-2xl text-base leading-7 md:text-lg" style={{ color: 'var(--neutral-600)' }}>
-            One dashboard for managing reviews, generating thoughtful replies, and spotting trends that matter.
+            One dashboard for managing reviews, applying your brand voice, and acting quickly when negative feedback arrives.
           </p>
         </div>
 
