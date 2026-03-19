@@ -490,7 +490,7 @@ export default function ReviewList({
     }
 
     return (
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+      <div className="flex flex-col gap-5">
         {needsAttention.map((review) => (
           <ReviewCard
             key={review.id}
@@ -523,7 +523,7 @@ export default function ReviewList({
     }
 
     return (
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+      <div className="flex flex-col gap-5">
         {posted.map((review) => (
           <ReviewCard
             key={review.id}
@@ -553,7 +553,7 @@ export default function ReviewList({
     }
 
     return (
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+      <div className="flex flex-col gap-5">
         {deletedReplies.map((review) => (
           <ReviewCard
             key={review.id}
@@ -597,7 +597,7 @@ export default function ReviewList({
     }
 
     return (
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+      <div className="flex flex-col gap-5">
         {backlog.map((review) => (
           <ReviewCard
             key={review.id}

@@ -1,15 +1,83 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { createServerClient } from "@/lib/supabaseServerClient"
-import { getFeatureGateApiMessage, hasFeature, normalizePlan } from "@/lib/subscription"
+import { hasFeature, normalizePlan } from "@/lib/subscription"
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
 
 type Bucket = { label: string; value: number }
+type DateRangePreset = "7d" | "30d" | "90d" | "custom"
+
+type ResolvedDateRange = {
+  preset: DateRangePreset
+  startIso: string
+  endIso: string
+  label: string
+}
 
 function toBuckets(record: Record<string, number>): Bucket[] {
   return Object.entries(record)
     .map(([label, value]) => ({ label, value }))
     .filter((b) => b.value > 0)
+}
+
+function formatYmd(date: Date) {
+  return date.toISOString().slice(0, 10)
+}
+
+function buildDateRange(inputPreset: unknown, inputStart: unknown, inputEnd: unknown): ResolvedDateRange {
+  const now = new Date()
+  const end = new Date(now)
+  end.setHours(23, 59, 59, 999)
+
+  const preset: DateRangePreset =
+    inputPreset === "7d" || inputPreset === "30d" || inputPreset === "90d" || inputPreset === "custom"
+      ? inputPreset
+      : "30d"
+
+  if (preset === "custom") {
+    const parsedStart = typeof inputStart === "string" ? new Date(inputStart) : null
+    const parsedEnd = typeof inputEnd === "string" ? new Date(inputEnd) : null
+    if (parsedStart && parsedEnd && !Number.isNaN(parsedStart.getTime()) && !Number.isNaN(parsedEnd.getTime())) {
+      parsedStart.setHours(0, 0, 0, 0)
+      parsedEnd.setHours(23, 59, 59, 999)
+
+      if (parsedStart <= parsedEnd) {
+        return {
+          preset,
+          startIso: parsedStart.toISOString(),
+          endIso: parsedEnd.toISOString(),
+          label: `${formatYmd(parsedStart)} to ${formatYmd(parsedEnd)}`,
+        }
+      }
+    }
+  }
+
+  const dayCount = preset === "7d" ? 7 : preset === "90d" ? 90 : 30
+  const start = new Date(end)
+  start.setDate(end.getDate() - (dayCount - 1))
+  start.setHours(0, 0, 0, 0)
+
+  return {
+    preset: preset === "custom" ? "30d" : preset,
+    startIso: start.toISOString(),
+    endIso: end.toISOString(),
+    label: `Last ${dayCount} days`,
+  }
+}
+
+function buildDailyBuckets(startIso: string, endIso: string, counts: Map<string, number>) {
+  const start = new Date(startIso)
+  const end = new Date(endIso)
+  const buckets: Bucket[] = []
+
+  const cursor = new Date(start)
+  while (cursor <= end) {
+    const key = formatYmd(cursor)
+    buckets.push({ label: key, value: counts.get(key) ?? 0 })
+    cursor.setDate(cursor.getDate() + 1)
+  }
+
+  return buckets
 }
 
 export async function POST(req: NextRequest) {
@@ -37,6 +105,9 @@ export async function POST(req: NextRequest) {
   logApiRequest({ requestId, endpoint, userId: user.id })
   const body = await req.json().catch(() => ({}))
   const requestedBusinessId = typeof body?.businessId === "string" ? body.businessId : null
+  const requestedRangePreset = body?.rangePreset
+  const requestedStartDate = body?.startDate
+  const requestedEndDate = body?.endDate
 
   const { data: businesses, error: businessesError } = await supabase
     .from("businesses")
@@ -64,18 +135,25 @@ export async function POST(req: NextRequest) {
     .maybeSingle()
 
   const resolvedPlan = normalizePlan(userRow?.plan)
-
-  if (!hasFeature(resolvedPlan, "analytics")) {
-    logApiError({ requestId, endpoint, userId: user.id, status: 403, message: "Plan does not include analytics", error: "plan_gate", plan: resolvedPlan })
-    return NextResponse.json({ error: getFeatureGateApiMessage("analytics") }, { status: 403 })
-  }
+  const canUseAdvancedAnalytics = hasFeature(resolvedPlan, "advancedAnalytics")
+  const appliedRange = canUseAdvancedAnalytics
+    ? buildDateRange(requestedRangePreset, requestedStartDate, requestedEndDate)
+    : null
 
   const selectedBusinessId = selectedBusiness.id
 
-  const { data: reviews, error: reviewsError } = await supabase
+  let reviewsQuery = supabase
     .from("reviews")
-    .select("id, rating, latest_reply_id")
+    .select("id, rating, latest_reply_id, review_time, created_at")
     .eq("business_id", selectedBusinessId)
+
+  if (appliedRange) {
+    reviewsQuery = reviewsQuery
+      .gte("review_time", appliedRange.startIso)
+      .lte("review_time", appliedRange.endIso)
+  }
+
+  const { data: reviews, error: reviewsError } = await reviewsQuery
 
   if (reviewsError) {
     logApiError({ requestId, endpoint, userId: user.id, status: 500, message: "Failed to load reviews", error: reviewsError.message })
@@ -87,7 +165,7 @@ export async function POST(req: NextRequest) {
   const { data: replies, error: repliesError } = reviewIds.length
     ? await supabase
         .from("review_replies")
-        .select("id, review_id, status, source")
+        .select("id, review_id, status, source, created_at")
         .in("review_id", reviewIds)
     : { data: [], error: null }
 
@@ -99,7 +177,7 @@ export async function POST(req: NextRequest) {
   const { data: analyses, error: analysisError } = reviewIds.length
     ? await supabase
         .from("review_analysis")
-        .select("review_id, sentiment")
+        .select("review_id, sentiment, created_at")
         .in("review_id", reviewIds)
     : { data: [], error: null }
 
@@ -178,6 +256,26 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const reviewTrendCount = new Map<string, number>()
+  for (const review of reviews ?? []) {
+    const key = formatYmd(new Date(review.review_time ?? review.created_at))
+    reviewTrendCount.set(key, (reviewTrendCount.get(key) ?? 0) + 1)
+  }
+
+  const postedReplyTrendCount = new Map<string, number>()
+  for (const reply of replies ?? []) {
+    if (reply.status !== "posted") continue
+    const key = formatYmd(new Date(reply.created_at))
+    postedReplyTrendCount.set(key, (postedReplyTrendCount.get(key) ?? 0) + 1)
+  }
+
+  const negativeSentimentTrendCount = new Map<string, number>()
+  for (const analysis of analyses ?? []) {
+    if ((analysis.sentiment || "").toLowerCase() !== "negative") continue
+    const key = formatYmd(new Date(analysis.created_at))
+    negativeSentimentTrendCount.set(key, (negativeSentimentTrendCount.get(key) ?? 0) + 1)
+  }
+
   const analytics = {
     totals: {
       reviews: reviews?.length ?? 0,
@@ -199,6 +297,28 @@ export async function POST(req: NextRequest) {
       replyStatuses: toBuckets(statusCount),
       replySources: toBuckets(sourceCount),
       sentiment: toBuckets(sentimentCount),
+    },
+    advanced: {
+      enabled: canUseAdvancedAnalytics,
+      range: appliedRange
+        ? {
+            preset: appliedRange.preset,
+            startDate: appliedRange.startIso,
+            endDate: appliedRange.endIso,
+            label: appliedRange.label,
+          }
+        : null,
+      trends: appliedRange
+        ? {
+            reviewsByDay: buildDailyBuckets(appliedRange.startIso, appliedRange.endIso, reviewTrendCount),
+            postedRepliesByDay: buildDailyBuckets(appliedRange.startIso, appliedRange.endIso, postedReplyTrendCount),
+            negativeSentimentByDay: buildDailyBuckets(appliedRange.startIso, appliedRange.endIso, negativeSentimentTrendCount),
+          }
+        : {
+            reviewsByDay: [],
+            postedRepliesByDay: [],
+            negativeSentimentByDay: [],
+          },
     },
   }
 

@@ -15,8 +15,6 @@ export default function Navbar() {
   const [activeSection, setActiveSection] = useState<string>("")
   const [nowMs, setNowMs] = useState<number>(() => Date.now())
 
-  const canViewAnalytics = hasFeature(subscription.plan, "analytics")
-
   useEffect(() => {
     async function loadSession() {
       const { data } = await supabase.auth.getSession()
@@ -40,12 +38,10 @@ export default function Navbar() {
     if (!isAuthenticated) return
 
     router.prefetch("/dashboard")
-    if (canViewAnalytics) {
-      router.prefetch("/dashboard/analytics")
-    }
+    router.prefetch("/dashboard/analytics")
     router.prefetch("/connect-business")
     router.prefetch("/subscriptions")
-  }, [isAuthenticated, router, canViewAnalytics])
+  }, [isAuthenticated, router])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -107,29 +103,46 @@ export default function Navbar() {
   })()
 
   const getNavLinkClass = (isActive: boolean) => {
-    return `inline-flex cursor-pointer items-center rounded-md px-2 py-1 text-sm font-semibold tracking-wide transition-all duration-200 ease-out ${
-      isActive
-        ? "text-blue-700 border-b-2 border-blue-600 bg-blue-50"
-        : "text-slate-700 hover:text-blue-600 hover:bg-slate-100 border-b-2 border-transparent"
-    }`
+    return `inline-flex cursor-pointer items-center rounded-md px-2 py-1 text-sm font-semibold tracking-wide transition-all duration-200 ease-out border-b-2 ${
+      isActive ? "" : ""
+    }`;
   }
 
+  const getNavLinkStyle = (isActive: boolean) => ({
+    color: isActive ? 'var(--primary-700)' : 'var(--neutral-700)',
+    borderBottomColor: isActive ? 'var(--primary-500)' : 'transparent',
+    backgroundColor: isActive ? 'var(--primary-50)' : 'transparent',
+  });
+
   return (
-    <nav className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/80 backdrop-blur-md shadow-sm">
-      <div className="flex w-full items-center justify-between py-4" style={{ paddingLeft: "2rem", paddingRight: "3rem" }}>
+    <nav className="sticky top-0 z-50 shadow-sm" style={{ borderBottomColor: 'color-mix(in srgb, var(--neutral-200) 80%, transparent)', borderBottomWidth: '1px', backgroundColor: 'color-mix(in srgb, white 85%, transparent)', backdropFilter: 'blur(12px)' }}>
+      <div className="relative flex w-full items-center justify-between py-4" style={{ paddingLeft: "2rem", paddingRight: "3rem" }}>
         {/* Left: Logo */}
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-          <Link href="/" className="transition hover:text-blue-600">
-            Review AI
+        <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--neutral-900)' }}>
+          <Link href="/" className="transition" style={{ color: 'var(--neutral-900)' }} onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--primary-600)')} onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--neutral-900)')}>
+            Revora
           </Link>
         </h1>
 
         {/* Center: Navigation */}
-        <div className="flex items-center justify-center gap-8">
+        <div className="absolute left-1/2 hidden -translate-x-1/2 items-center justify-center gap-8 md:flex">
           <button
             type="button"
             onClick={() => navigateToSection("about")}
             className={getNavLinkClass(pathname === "/" && activeSection === "about")}
+            style={getNavLinkStyle(pathname === "/" && activeSection === "about")}
+            onMouseEnter={(e) => {
+              if (pathname !== "/" || activeSection !== "about") {
+                e.currentTarget.style.color = 'var(--primary-600)';
+                e.currentTarget.style.backgroundColor = 'var(--primary-50)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (pathname !== "/" || activeSection !== "about") {
+                e.currentTarget.style.color = 'var(--neutral-700)';
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }
+            }}
           >
             About
           </button>
@@ -138,6 +151,19 @@ export default function Navbar() {
             type="button"
             onClick={() => navigateToSection("features")}
             className={getNavLinkClass(pathname === "/" && activeSection === "features")}
+            style={getNavLinkStyle(pathname === "/" && activeSection === "features")}
+            onMouseEnter={(e) => {
+              if (pathname !== "/" || activeSection !== "features") {
+                e.currentTarget.style.color = 'var(--primary-600)';
+                e.currentTarget.style.backgroundColor = 'var(--primary-50)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (pathname !== "/" || activeSection !== "features") {
+                e.currentTarget.style.color = 'var(--neutral-700)';
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }
+            }}
           >
             Features
           </button>
@@ -147,22 +173,59 @@ export default function Navbar() {
               <Link
                 href="/dashboard"
                 className={getNavLinkClass(pathname === "/dashboard")}
+                style={getNavLinkStyle(pathname === "/dashboard")}
+                onMouseEnter={(e) => {
+                  if (pathname !== "/dashboard") {
+                    e.currentTarget.style.color = 'var(--primary-600)';
+                    e.currentTarget.style.backgroundColor = 'var(--primary-50)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (pathname !== "/dashboard") {
+                    e.currentTarget.style.color = 'var(--neutral-700)';
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }
+                }}
               >
                 Dashboard
               </Link>
 
-              {canViewAnalytics && (
-                <Link
-                  href="/dashboard/analytics"
-                  className={getNavLinkClass(pathname === "/dashboard/analytics")}
-                >
-                  Analytics
-                </Link>
-              )}
+              <Link
+                href="/dashboard/analytics"
+                className={getNavLinkClass(pathname === "/dashboard/analytics")}
+                style={getNavLinkStyle(pathname === "/dashboard/analytics")}
+                onMouseEnter={(e) => {
+                  if (pathname !== "/dashboard/analytics") {
+                    e.currentTarget.style.color = 'var(--primary-600)';
+                    e.currentTarget.style.backgroundColor = 'var(--primary-50)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (pathname !== "/dashboard/analytics") {
+                    e.currentTarget.style.color = 'var(--neutral-700)';
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                Analytics
+              </Link>
 
               <Link
                 href="/connect-business"
                 className={getNavLinkClass(pathname === "/connect-business")}
+                style={getNavLinkStyle(pathname === "/connect-business")}
+                onMouseEnter={(e) => {
+                  if (pathname !== "/connect-business") {
+                    e.currentTarget.style.color = 'var(--primary-600)';
+                    e.currentTarget.style.backgroundColor = 'var(--primary-50)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (pathname !== "/connect-business") {
+                    e.currentTarget.style.color = 'var(--neutral-700)';
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }
+                }}
               >
                 Connect Business
               </Link>
@@ -170,6 +233,19 @@ export default function Navbar() {
               <Link
                 href="/subscriptions"
                 className={getNavLinkClass(pathname === "/subscriptions")}
+                style={getNavLinkStyle(pathname === "/subscriptions")}
+                onMouseEnter={(e) => {
+                  if (pathname !== "/subscriptions") {
+                    e.currentTarget.style.color = 'var(--primary-600)';
+                    e.currentTarget.style.backgroundColor = 'var(--primary-50)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (pathname !== "/subscriptions") {
+                    e.currentTarget.style.color = 'var(--neutral-700)';
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }
+                }}
               >
                 Subscriptions
               </Link>
@@ -178,9 +254,9 @@ export default function Navbar() {
         </div>
 
         {/* Right: Auth & Settings */}
-        <div className="flex items-center justify-end gap-4 ml-auto">
+        <div className="ml-auto flex items-center justify-end gap-4">
           {isAuthenticated && (
-            <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-4 py-1.5 text-xs font-bold tracking-wide text-blue-800">
+            <span className="inline-flex items-center rounded-full px-4 py-1.5 text-xs font-bold tracking-wide" style={{ borderColor: 'var(--primary-200)', backgroundColor: 'var(--primary-50)', color: 'var(--primary-700)' }}>
               {subscription.plan === "free"
                 ? `Free Trial${trialTimeLabel ? `: ${trialTimeLabel}` : ""}`
                 : getPlanLabel(subscription.plan)}
@@ -193,9 +269,21 @@ export default function Navbar() {
               className="inline-flex items-center justify-center rounded-lg p-2 transition"
               style={
                 pathname === "/settings"
-                  ? { backgroundColor: "#eff6ff", color: "#2563eb" }
-                  : { color: "#475569" }
+                  ? { backgroundColor: 'var(--primary-50)', color: 'var(--primary-600)' }
+                  : { color: 'var(--neutral-600)' }
               }
+              onMouseEnter={(e) => {
+                if (pathname !== "/settings") {
+                  e.currentTarget.style.color = 'var(--primary-600)';
+                  e.currentTarget.style.backgroundColor = 'var(--primary-50)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (pathname !== "/settings") {
+                  e.currentTarget.style.color = 'var(--neutral-600)';
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }
+              }}
               title="Settings"
             >
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -209,7 +297,10 @@ export default function Navbar() {
             <button
               type="button"
               onClick={handleLogout}
-              className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-6 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-600"
+              className="inline-flex items-center justify-center rounded-lg px-6 py-2.5 text-sm font-medium text-white shadow-sm transition"
+              style={{ backgroundColor: 'var(--neutral-900)' }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--primary-600)')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--neutral-900)')}
             >
               Logout
             </button>
@@ -217,13 +308,25 @@ export default function Navbar() {
             <>
               <Link
                 href="/login?mode=signup"
-                className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-6 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:border-blue-300 hover:text-blue-600"
+                className="inline-flex items-center justify-center rounded-lg bg-white px-6 py-2.5 text-sm font-medium shadow-sm transition"
+                style={{ borderColor: 'var(--neutral-300)', borderWidth: '1px', color: 'var(--neutral-700)' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--primary-300)';
+                  e.currentTarget.style.color = 'var(--primary-600)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--neutral-300)';
+                  e.currentTarget.style.color = 'var(--neutral-700)';
+                }}
               >
                 Sign Up
               </Link>
               <Link
                 href="/login?mode=login"
-                className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-6 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-600"
+                className="inline-flex items-center justify-center rounded-lg px-6 py-2.5 text-sm font-medium text-white shadow-sm transition"
+                style={{ backgroundColor: 'var(--neutral-900)' }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--primary-600)')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--neutral-900)')}
               >
                 Sign In
               </Link>

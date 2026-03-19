@@ -210,6 +210,16 @@ Before production deployment, make sure:
 - Sentry DSN is set in production
 - Optional Sentry source map variables are added if you want readable production stack traces
 
+## Production Rollout Guide
+
+- Prioritized launch checklist: [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)
+- Production env template: [frontend/.env.production.example](frontend/.env.production.example)
+
+The production checklist is split into:
+
+- Mandatory (ship blockers)
+- Nice to have (post-launch hardening)
+
 ## Current Documentation Scope
 
 This README covers the application as it exists in the repository today. If you add billing, background jobs, cron sync, or admin tooling later, extend this document so setup and operational expectations stay accurate.

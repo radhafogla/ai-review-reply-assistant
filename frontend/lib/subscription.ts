@@ -2,6 +2,7 @@ export type SubscriptionPlan = "free" | "basic" | "premium"
 
 export type SubscriptionFeature =
   | "analytics"
+  | "advancedAnalytics"
   | "aiGeneration"
   | "bulkActions"
   | "multiBusiness"
@@ -40,6 +41,7 @@ export const PLAN_PRICING: Record<SubscriptionPlan, string> = {
 
 export const PLAN_FEATURE_ORDER: SubscriptionFeature[] = [
   "analytics",
+  "advancedAnalytics",
   "aiGeneration",
   "bulkActions",
   "multiBusiness",
@@ -47,7 +49,8 @@ export const PLAN_FEATURE_ORDER: SubscriptionFeature[] = [
 ]
 
 export const PLAN_FEATURE_LABELS: Record<SubscriptionFeature, string> = {
-  analytics: "Analytics page",
+  analytics: "Basic analytics",
+  advancedAnalytics: "Advanced analytics",
   aiGeneration: "AI reply generation",
   bulkActions: "Bulk generate and post",
   multiBusiness: "Multiple connected businesses",
@@ -56,7 +59,8 @@ export const PLAN_FEATURE_LABELS: Record<SubscriptionFeature, string> = {
 
 export const PLAN_FEATURES: Record<SubscriptionPlan, FeatureMap> = {
   free: {
-    analytics: false,
+    analytics: true,
+    advancedAnalytics: false,
     aiGeneration: true,
     bulkActions: false,
     multiBusiness: false,
@@ -64,6 +68,7 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, FeatureMap> = {
   },
   basic: {
     analytics: true,
+    advancedAnalytics: true,
     aiGeneration: true,
     bulkActions: true,
     multiBusiness: false,
@@ -71,6 +76,7 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, FeatureMap> = {
   },
   premium: {
     analytics: true,
+    advancedAnalytics: true,
     aiGeneration: true,
     bulkActions: true,
     multiBusiness: true,
@@ -200,6 +206,10 @@ export function getFeatureGateApiMessage(feature: SubscriptionFeature) {
     return "Analytics is not included in your current plan"
   }
 
+  if (feature === "advancedAnalytics") {
+    return "Advanced analytics is available on Basic and Premium plans"
+  }
+
   if (feature === "premiumAutoReply") {
     return "Premium auto-reply is available only on Premium plan"
   }
@@ -212,6 +222,10 @@ export function getFeatureGateTitle(feature: SubscriptionFeature) {
     return "Analytics is not available on Free"
   }
 
+  if (feature === "advancedAnalytics") {
+    return "Advanced analytics is available on Basic and Premium"
+  }
+
   if (feature === "premiumAutoReply") {
     return "Premium auto-reply is available on Premium"
   }
@@ -222,6 +236,10 @@ export function getFeatureGateTitle(feature: SubscriptionFeature) {
 export function getFeatureGateUpgradeHint(feature: SubscriptionFeature) {
   if (feature === "analytics") {
     return "Upgrade to Basic or Premium to view analytics charts and performance insights."
+  }
+
+  if (feature === "advancedAnalytics") {
+    return "Upgrade to Basic or Premium to unlock date-range filters and daily trend analysis."
   }
 
   if (feature === "premiumAutoReply") {

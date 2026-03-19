@@ -1,13 +1,13 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import Link from "next/link"
 import { supabase } from "@/lib/supabaseClient"
 import { useSubscription } from "@/app/hooks/useSubscription"
-import { getFeatureGateTitle, getFeatureGateUpgradeHint, hasFeature } from "@/lib/subscription"
+import { getFeatureGateUpgradeHint, hasFeature } from "@/lib/subscription"
 import EmptyState from "@/app/components/EmptyState"
 
 type Bucket = { label: string; value: number }
+type DateRangePreset = "7d" | "30d" | "90d" | "custom"
 
 type AnalyticsPayload = {
   totals: {
@@ -30,6 +30,20 @@ type AnalyticsPayload = {
     replyStatuses: Bucket[]
     replySources: Bucket[]
     sentiment: Bucket[]
+  }
+  advanced: {
+    enabled: boolean
+    range: {
+      preset: DateRangePreset
+      startDate: string
+      endDate: string
+      label: string
+    } | null
+    trends: {
+      reviewsByDay: Bucket[]
+      postedRepliesByDay: Bucket[]
+      negativeSentimentByDay: Bucket[]
+    }
   }
 }
 
@@ -104,6 +118,48 @@ function PieChart({ title, data, palette }: { title: string; data: Bucket[]; pal
   )
 }
 
+function TrendBars({ title, data, color }: { title: string; data: Bucket[]; color: string }) {
+  const max = Math.max(...data.map((d) => d.value), 1)
+
+  return (
+    <div style={{ borderRadius: 14, border: "1.5px solid #e2e8f0", backgroundColor: "#ffffff", padding: 16 }}>
+      <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f172a" }}>{title}</h3>
+
+      {data.length === 0 ? (
+        <p style={{ marginTop: 12, marginBottom: 0, fontSize: 13, color: "#64748b" }}>No data in selected range</p>
+      ) : (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))`, gap: 6, alignItems: "end", height: 150 }}>
+            {data.map((bucket) => {
+              const heightPct = Math.max(6, Math.round((bucket.value / max) * 100))
+              return (
+                <div key={bucket.label} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "end", gap: 4 }}>
+                  <span style={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>{bucket.value}</span>
+                  <div
+                    title={`${bucket.label}: ${bucket.value}`}
+                    style={{
+                      width: "100%",
+                      minWidth: 6,
+                      borderRadius: 6,
+                      backgroundColor: color,
+                      height: `${heightPct}%`,
+                    }}
+                  />
+                </div>
+              )
+            })}
+          </div>
+
+          <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between", fontSize: 11, color: "#64748b", fontWeight: 700 }}>
+            <span>{data[0]?.label ?? ""}</span>
+            <span>{data[data.length - 1]?.label ?? ""}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AnalyticsPage() {
   const { loading: subscriptionLoading, subscription } = useSubscription()
   const [hasBusiness, setHasBusiness] = useState(true)
@@ -111,8 +167,13 @@ export default function AnalyticsPage() {
   const [businesses, setBusinesses] = useState<Array<{ id: string; name: string | null }>>([])
   const [selectedBusinessId, setSelectedBusinessId] = useState("")
   const [analytics, setAnalytics] = useState<AnalyticsPayload | null>(null)
+  const [rangePreset, setRangePreset] = useState<DateRangePreset>("30d")
+  const [customStartDate, setCustomStartDate] = useState("")
+  const [customEndDate, setCustomEndDate] = useState("")
 
-  const loadAnalytics = useCallback(async (businessId?: string) => {
+  const canUseAdvancedAnalytics = hasFeature(subscription.plan, "advancedAnalytics")
+
+  const loadAnalytics = useCallback(async (businessId?: string, range?: { preset: DateRangePreset; startDate?: string; endDate?: string }) => {
     setLoading(true)
 
     const { data: { session } } = await supabase.auth.getSession()
@@ -130,7 +191,12 @@ export default function AnalyticsPage() {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ businessId: businessId || undefined }),
+      body: JSON.stringify({
+        businessId: businessId || undefined,
+        rangePreset: range?.preset,
+        startDate: range?.startDate,
+        endDate: range?.endDate,
+      }),
     })
 
     const data = await res.json()
@@ -159,52 +225,32 @@ export default function AnalyticsPage() {
   }, [])
 
   useEffect(() => {
-    if (subscriptionLoading || !hasFeature(subscription.plan, "analytics")) return
+    if (subscriptionLoading) return
+
+    if (canUseAdvancedAnalytics && rangePreset === "custom" && (!customStartDate || !customEndDate)) {
+      return
+    }
+
+    const activeRange = canUseAdvancedAnalytics
+      ? {
+          preset: rangePreset,
+          startDate: rangePreset === "custom" ? customStartDate : undefined,
+          endDate: rangePreset === "custom" ? customEndDate : undefined,
+        }
+      : undefined
 
     const run = async () => {
-      await loadAnalytics(selectedBusinessId || undefined)
+      await loadAnalytics(selectedBusinessId || undefined, activeRange)
     }
     run()
-  }, [selectedBusinessId, loadAnalytics, subscription.plan, subscriptionLoading])
-
-  if (!subscriptionLoading && !hasFeature(subscription.plan, "analytics")) {
-    return (
-      <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc", padding: "32px 24px 40px" }}>
-        <div style={{ maxWidth: 980, margin: "0 auto" }}>
-          <section style={{ borderRadius: 16, border: "1px solid #bfdbfe", backgroundColor: "#eff6ff", padding: 24 }}>
-            <h1 style={{ margin: 0, fontSize: 26, color: "#1e3a8a", fontWeight: 800 }}>{getFeatureGateTitle("analytics")}</h1>
-            <p style={{ marginTop: 8, marginBottom: 0, color: "#334155", fontSize: 14, lineHeight: 1.7 }}>
-              {getFeatureGateUpgradeHint("analytics")}
-            </p>
-            <Link
-              href="/subscriptions"
-              style={{
-                marginTop: 14,
-                display: "inline-flex",
-                alignItems: "center",
-                borderRadius: 10,
-                border: "1px solid #1d4ed8",
-                backgroundColor: "#2563eb",
-                color: "#fff",
-                padding: "8px 14px",
-                fontSize: 13,
-                fontWeight: 700,
-                textDecoration: "none",
-              }}
-            >
-              View Subscriptions
-            </Link>
-          </section>
-        </div>
-      </div>
-    )
-  }
+  }, [selectedBusinessId, loadAnalytics, subscriptionLoading, canUseAdvancedAnalytics, rangePreset, customStartDate, customEndDate])
 
   if (!hasBusiness) return <EmptyState />
 
   const totals = analytics?.totals
   const premium = analytics?.premium
   const isPremiumPlan = (totals?.plan || subscription.plan).toLowerCase() === "premium"
+  const advanced = analytics?.advanced
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc" }}>
@@ -259,6 +305,52 @@ export default function AnalyticsPage() {
                   Plan: {(totals?.plan || "free").toUpperCase()} ({totals?.subscriptionStatus || "active"})
                 </span>
               </div>
+            </div>
+
+            <div style={{ marginTop: 12 }}>
+              {canUseAdvancedAnalytics ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#334155", textTransform: "uppercase", letterSpacing: "0.08em" }}>Range</span>
+                  <select
+                    value={rangePreset}
+                    onChange={(e) => setRangePreset(e.target.value as DateRangePreset)}
+                    style={{ borderRadius: 10, border: "1.5px solid #cbd5e1", backgroundColor: "#fff", color: "#0f172a", fontSize: 13, fontWeight: 600, padding: "8px 12px", outline: "none" }}
+                  >
+                    <option value="7d">Last 7 days</option>
+                    <option value="30d">Last 30 days</option>
+                    <option value="90d">Last 90 days</option>
+                    <option value="custom">Custom range</option>
+                  </select>
+
+                  {rangePreset === "custom" && (
+                    <>
+                      <input
+                        type="date"
+                        value={customStartDate}
+                        onChange={(e) => setCustomStartDate(e.target.value)}
+                        style={{ borderRadius: 10, border: "1.5px solid #cbd5e1", backgroundColor: "#fff", color: "#0f172a", fontSize: 13, fontWeight: 600, padding: "8px 12px", outline: "none" }}
+                      />
+                      <input
+                        type="date"
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                        style={{ borderRadius: 10, border: "1.5px solid #cbd5e1", backgroundColor: "#fff", color: "#0f172a", fontSize: 13, fontWeight: 600, padding: "8px 12px", outline: "none" }}
+                      />
+                    </>
+                  )}
+
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>
+                    {advanced?.range?.label ?? ""}
+                  </span>
+                </div>
+              ) : (
+                <div style={{ marginTop: 6, borderRadius: 12, border: "1px solid #cbd5e1", backgroundColor: "#f8fafc", padding: "10px 12px" }}>
+                  <p style={{ margin: 0, fontSize: 12, color: "#334155", fontWeight: 700 }}>Advanced analytics preview</p>
+                  <p style={{ marginTop: 4, marginBottom: 0, fontSize: 12, color: "#64748b" }}>
+                    {getFeatureGateUpgradeHint("advancedAnalytics")}
+                  </p>
+                </div>
+              )}
             </div>
 
             <div style={{ marginTop: 16, display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
@@ -318,6 +410,23 @@ export default function AnalyticsPage() {
           <PieChart title="Reply source mix" data={analytics?.charts.replySources ?? []} palette={["#6366f1", "#14b8a6", "#0ea5e9"]} />
           <PieChart title="Sentiment breakdown" data={analytics?.charts.sentiment ?? []} palette={["#22c55e", "#f59e0b", "#ef4444"]} />
         </div>
+
+        {canUseAdvancedAnalytics && (
+          <section style={{ marginTop: 20 }}>
+            <div style={{ marginBottom: 10 }}>
+              <h2 style={{ margin: 0, fontSize: 20, color: "#0f172a", fontWeight: 800 }}>Advanced trends</h2>
+              <p style={{ marginTop: 6, marginBottom: 0, color: "#64748b", fontSize: 13 }}>
+                Daily movement across reviews, posted replies, and negative sentiment.
+              </p>
+            </div>
+
+            <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
+              <TrendBars title="Reviews by day" data={advanced?.trends.reviewsByDay ?? []} color="#3b82f6" />
+              <TrendBars title="Posted replies by day" data={advanced?.trends.postedRepliesByDay ?? []} color="#059669" />
+              <TrendBars title="Negative sentiment by day" data={advanced?.trends.negativeSentimentByDay ?? []} color="#ef4444" />
+            </div>
+          </section>
+        )}
       </div>
     </div>
   )
