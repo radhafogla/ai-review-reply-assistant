@@ -23,7 +23,7 @@ export default function LoginContent() {
 
   const isGmailAddress = /^[^@]+@(gmail|googlemail)\.com$/i.test(email.trim())
 
-  const getRedirectTo = () => `${window.location.origin}/connect-business`
+  const getRedirectTo = () => `${window.location.origin}/connect-business?postAuth=1`
 
   const ensureUserRecord = async (accessToken: string) => {
     const res = await fetch("/api/ensure-user", {

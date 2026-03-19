@@ -38,10 +38,10 @@ export async function POST(req: NextRequest) {
       id,
       review_id,
       latest_reply_id,
-      businesses (
-        account_id,
-        location_id
-      ),
+        businesses (
+          account_id,
+          external_business_id
+        ),
       latest_reply:review_replies!reviews_latest_reply_id_fkey (
         id,
         reply_text,
@@ -60,15 +60,14 @@ export async function POST(req: NextRequest) {
   const business = Array.isArray(review.businesses) ? review.businesses[0] : review.businesses
   const latestReply = Array.isArray(review.latest_reply) ? review.latest_reply[0] : review.latest_reply
 
-  if (!business?.account_id || !business?.location_id || !review.review_id) {
+  if (!business?.account_id || !business?.external_business_id || !review.review_id) {
     return NextResponse.json({ error: "Review is missing Google mapping" }, { status: 400 })
   }
-
   if (!latestReply?.id || latestReply.status !== "posted") {
     return NextResponse.json({ error: "Only posted replies can be deleted" }, { status: 400 })
   }
 
-  const url = `https://mybusiness.googleapis.com/v4/accounts/${business.account_id}/locations/${business.location_id}/reviews/${review.review_id}/reply`
+  const url = `https://mybusiness.googleapis.com/v4/accounts/${business.account_id}/locations/${business.external_business_id}/reviews/${review.review_id}/reply`
 
   const googleRes = await fetch(url, {
     method: "DELETE",

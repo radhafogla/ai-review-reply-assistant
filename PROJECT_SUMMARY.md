@@ -1,10 +1,10 @@
 # AI Review Reply Assistant - Project Summary
 
-Last updated: 2026-03-18
+Last updated: 2026-03-19
 
 ## Executive Summary
 
-AI Review Reply Assistant is a Next.js application that helps businesses manage Google reviews end-to-end: connect Google Business Profile locations, sync reviews into Supabase, generate AI-assisted replies, edit drafts, and post responses back to Google. The app now supports both email/password auth and Google OAuth, improved user provisioning reliability, smarter post-auth routing, centralized subscription gating, and premium auto-reply controls with analytics visibility.
+AI Review Reply Assistant is a Next.js application that helps businesses manage Google reviews end-to-end: connect Google Business Profile locations, sync reviews into Supabase, generate AI-assisted replies, edit drafts, and post responses back to Google. The app now supports both email/password auth and Google OAuth, improved user provisioning reliability, smarter post-auth routing, centralized subscription gating, premium auto-reply controls, per-review AI draft limits, and manual sentiment analysis with cached premium insights.
 
 ## Product Scope
 
@@ -15,9 +15,11 @@ AI Review Reply Assistant is a Next.js application that helps businesses manage 
 - Post replies to Google from the app
 - Track reply lifecycle states (draft, posted, failed, deleted)
 - Provide analytics and workflow filtering
+- Run manual sentiment analysis from the analytics experience
 - Apply subscription-based feature gating
 - Support single-business workflows first, with multi-business expansion on higher plans
 - Offer premium automation controls for high-rating review replies
+- Surface premium-only themes, AI suggestions, and sentiment trend views
 - Capture structured API logs and Sentry error reporting
 
 ## Current Architecture
@@ -30,7 +32,7 @@ Frontend and API:
 Data and auth:
 - Supabase Auth for authentication
 - Supabase Postgres for application data
-- Core tables include users, subscriptions, integrations, businesses, reviews, review_replies, review_analysis, usage_events
+- Core tables include users, subscriptions, integrations, businesses, reviews, review_replies, review_analysis, sentiment_cache, usage_events
 - schema.sql is treated as the source of truth and should stay aligned with baseline migrations
 
 External integrations:
@@ -68,18 +70,20 @@ Implemented:
 
 Feature gating:
 - Analytics available on Basic and Premium
+- Manual sentiment analysis available on Basic and Premium
 - Bulk actions available on Basic and Premium
 - Multi-business access available on Premium
 - Premium auto-reply available only on Premium
+- Theme clustering, AI suggestions, and sentiment trend views available only on Premium
 
 Limits and enforcement:
-- Monthly AI generations and connected-business limits are centralized in shared constants
-- Limit handling currently uses soft warnings rather than hard blocking
-- Warning events are tracked in usage_events when users approach or exceed plan limits
+- Connected-business limits are centralized in shared constants
+- Per-review AI draft generation is hard-capped at 5 attempts per review
+- Warning events are tracked in usage_events where applicable
 - Current limits:
-   - Free Trial: 100 AI generations/month, 1 connected business
-   - Basic: 1000 AI generations/month, 1 connected business
-   - Premium: 5000 AI generations/month, 3 connected businesses
+   - Free Trial: 1 connected business
+   - Basic: 1 connected business
+   - Premium: 3 connected businesses
 
 ## Premium Auto-Reply (Completed)
 
@@ -92,6 +96,21 @@ Implemented:
 Observed analytics support:
 - Premium analytics now report auto-reply attempted, posted, failed, and success rate metrics
 - Auto-reply metrics are segmented per selected business in the analytics view
+
+## Analytics and Sentiment Insights (Completed)
+
+Implemented:
+- Manual sentiment analysis action on the analytics page for Basic and Premium users
+- Cached sentiment results stored in sentiment_cache with Last Analyzed timestamp and analyzed review count
+- Staleness detection when new reviews are synced after the last analysis run
+- Basic users can view cached sentiment breakdowns after running analysis
+- Premium users additionally receive cached key themes, AI suggestions, and 30-day positive/negative trend views
+
+Behavior:
+1. User opens analytics and selects a business
+2. If cached analysis exists, the UI shows the latest cached result and whether it is stale
+3. If new reviews arrived since the previous run, the UI prompts the user to refresh analysis
+4. Clicking Analyze or Refresh computes missing review analysis, aggregates insights, caches the result, and updates the view
 
 ## UX Updates (Completed)
 
@@ -110,13 +129,14 @@ Forgot-password flow:
 
 ## API Surface Snapshot
 
-Current route handlers under frontend/app/api: 21
+Current route handlers under frontend/app/api: 23
 
 Includes:
 - auth/signup
 - analytics
 - analytics/internal
 - analyze-review
+- analyze-reviews
 - connect-google-business
 - contact
 - delete-account
@@ -132,6 +152,7 @@ Includes:
 - premium-auto-reply
 - save-business
 - save-reply
+- sentiment-cache
 - subscription
 - sync-reviews
 
@@ -149,29 +170,18 @@ Notes:
 - Soft-limit subscription warnings and usage tracking
 - Premium auto-reply settings with default-off behavior
 - Premium analytics card for auto-reply attempted/posted/failed/success-rate metrics
+- Manual sentiment analysis with cached Last Analyzed state
+- Premium insight cache with themes, AI suggestions, and sentiment trend views
+- Per-review AI reply cap of 5 generations with inline remaining-attempt UI
 - Login card layout and spacing refinements
 - Forgot-password and reset-password flow implementation
 - README updates to reflect the current implementation state
 
 ## Suggested Next Milestones
 
-- Expand analytics depth beyond current KPI cards and pie charts
-- AI Review Insights Dashboard for Premium Subscription:
-   - Extract per review: sentiment (positive/neutral/negative), key topics (for example service, wait time, pricing), emotion (frustration, delight, disappointment), and intent (complaint, praise, suggestion)
-   - Show outcomes: percent positive vs negative over time, top recurring issues, and top praised aspects
-   - Example insight: "30% of negative reviews mention slow service"
-- Theme and Topic Clustering:
-   - Generate embeddings for reviews (OpenAI or similar) and cluster into themes
-   - Example clusters: Customer Service Issues, Food Quality, Delivery Delays
-   - Show outcomes: volume per cluster, sentiment per cluster, and trend over time
-- AI-Powered Business Suggestions:
-   - Feed AI with top negative themes, example reviews, and business category
-   - Return actionable recommendations for operators
-   - Example suggestion: "Customers frequently mention long wait times during weekends. Consider adding staff or implementing a booking system during peak hours."
-- Trend Detection:
-   - Track topic and sentiment evolution over time
-   - Example insights: "Complaints about wait time increased 22% this month" and "Staff friendliness mentions improving"
-   - Implementation approach: store topic + sentiment + timestamp and run periodic aggregation jobs
+- Add background refresh or scheduled recompute for premium sentiment cache
+- Improve topic extraction quality and deduplicate overlapping themes
+- Refine AI suggestions with stronger business context and category-aware recommendations
 - Add callback success/failure toast states for Google connection flow
 - Harden reliability around background automation and retry/failure workflows
 
@@ -186,8 +196,10 @@ Notes:
 - frontend/app/hooks/useSubscription.ts
 - frontend/app/api/subscription/route.ts
 - frontend/app/api/premium-auto-reply/route.ts
+- frontend/app/api/analyze-reviews/route.ts
 - frontend/app/dashboard/analytics/page.tsx
 - frontend/app/subscriptions/page.tsx
+- frontend/app/api/sentiment-cache/route.ts
 - frontend/app/api/connect-google-business/route.ts
 - frontend/app/api/google-callback/route.ts
 - schema.sql

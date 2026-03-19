@@ -313,13 +313,14 @@ export async function POST(req: NextRequest) {
 
   const { data: business, error: businessError } = await supabase
     .from("businesses")
-    .select("id, account_id, location_id, name, reply_tone")
+    .select("id, account_id, external_business_id, name, reply_tone, platform")
     .eq("user_id", userId)
+    .eq("platform", "google")
     .single()
 
   if (businessError || !business) {
     return NextResponse.json(
-      { error: "No business connected" },
+      { error: "No google business connected" },
       { status: 400 }
     )
   }
@@ -371,7 +372,7 @@ export async function POST(req: NextRequest) {
     const googleReviews = await fetchGoogleReviews(
       accessToken,
       business.account_id ?? "-",
-      business.location_id,
+       business.external_business_id,
       latestKnownTimestamp,
       existingByReviewId
     )
@@ -641,7 +642,7 @@ export async function POST(req: NextRequest) {
             ai_reply_attempts: currentAttempts + 1,
           })
 
-          const googleReplyUrl = `https://mybusiness.googleapis.com/v4/accounts/${business.account_id}/locations/${business.location_id}/reviews/${candidate.review_id}/reply`
+          const googleReplyUrl = `https://mybusiness.googleapis.com/v4/accounts/${business.account_id}/locations/${business.external_business_id}/reviews/${candidate.review_id}/reply`
 
           const postRes = await fetch(googleReplyUrl, {
             method: "PUT",

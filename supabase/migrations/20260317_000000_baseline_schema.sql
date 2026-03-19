@@ -43,9 +43,8 @@ SET default_table_access_method = "heap";
 CREATE TABLE IF NOT EXISTS "public"."businesses" (
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
     "user_id" "uuid" NOT NULL,
-    "location_id" "text" NOT NULL,
+    "external_business_id" "text" NOT NULL,
     "name" "text" NOT NULL,
-    "reply_tone" "text" DEFAULT 'professional'::"text",
     "address" "text",
     "phone" "text",
     "connected_at" timestamp with time zone DEFAULT "now"(),
@@ -53,7 +52,10 @@ CREATE TABLE IF NOT EXISTS "public"."businesses" (
     "updated_at" timestamp with time zone DEFAULT "now"(),
     "last_synced_at" timestamp with time zone,
     "sync_status" "text" DEFAULT 'pending'::"text",
-    "sync_error" "text"
+    "sync_error" "text",
+    "reply_tone" "text" DEFAULT 'professional'::"text",
+    "platform" "text" DEFAULT 'google'::"text" NOT NULL,
+    CONSTRAINT "businesses_platform_check" CHECK (("platform" = ANY (ARRAY['google'::"text", 'yelp'::"text", 'facebook'::"text"])))
 );
 
 
@@ -140,11 +142,32 @@ CREATE TABLE IF NOT EXISTS "public"."reviews" (
     "needs_ai_reply" boolean DEFAULT true,
     "is_actionable" boolean DEFAULT true,
     "last_ai_attempt_at" timestamp with time zone,
-    "ai_reply_attempts" integer DEFAULT 0
+    "ai_reply_attempts" integer DEFAULT 0,
+    "platform" "text" DEFAULT 'google'::"text" NOT NULL,
+    CONSTRAINT "reviews_platform_check" CHECK (("platform" = ANY (ARRAY['google'::"text", 'yelp'::"text", 'facebook'::"text"])))
 );
 
 
 ALTER TABLE "public"."reviews" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."sentiment_cache" (
+        "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+        "business_id" "uuid" NOT NULL,
+        "analyzed_review_count" integer NOT NULL,
+        "analyzed_at" timestamp with time zone NOT NULL,
+        "sentiment_positive" integer DEFAULT 0,
+        "sentiment_neutral" integer DEFAULT 0,
+        "sentiment_negative" integer DEFAULT 0,
+        "themes" "jsonb" DEFAULT '{}'::"jsonb",
+        "suggestions" "jsonb" DEFAULT '{}'::"jsonb",
+        "sentiment_trend_by_day" "jsonb" DEFAULT '{}'::"jsonb",
+        "created_at" timestamp with time zone DEFAULT "now"(),
+        "updated_at" timestamp with time zone DEFAULT "now"()
+);
+
+
+ALTER TABLE "public"."sentiment_cache" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."subscriptions" (
@@ -201,6 +224,11 @@ ALTER TABLE ONLY "public"."businesses"
 
 
 
+ALTER TABLE ONLY "public"."businesses"
+    ADD CONSTRAINT "businesses_user_platform_unique" UNIQUE ("user_id", "external_business_id", "platform");
+
+
+
 ALTER TABLE ONLY "public"."contact_submissions"
     ADD CONSTRAINT "contact_submissions_pkey" PRIMARY KEY ("id");
 
@@ -228,6 +256,10 @@ ALTER TABLE ONLY "public"."reviews"
 
 ALTER TABLE ONLY "public"."reviews"
     ADD CONSTRAINT "reviews_review_id_key" UNIQUE ("review_id");
+
+
+ALTER TABLE ONLY "public"."sentiment_cache"
+    ADD CONSTRAINT "sentiment_cache_pkey" PRIMARY KEY ("id");
 
 
 
@@ -275,6 +307,9 @@ CREATE INDEX "idx_reviews_reply" ON "public"."reviews" USING "btree" ("latest_re
 CREATE INDEX "idx_reviews_time" ON "public"."reviews" USING "btree" ("review_time" DESC);
 
 
+CREATE INDEX "idx_sentiment_cache_business_latest" ON "public"."sentiment_cache" USING "btree" ("business_id", "analyzed_at" DESC);
+
+
 
 CREATE INDEX "idx_usage_events_business" ON "public"."usage_events" USING "btree" ("business_id");
 
@@ -309,6 +344,9 @@ CREATE OR REPLACE TRIGGER "set_updated_at_review_replies" BEFORE UPDATE ON "publ
 
 
 CREATE OR REPLACE TRIGGER "set_updated_at_reviews" BEFORE UPDATE ON "public"."reviews" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
+
+
+CREATE OR REPLACE TRIGGER "set_updated_at_sentiment_cache" BEFORE UPDATE ON "public"."sentiment_cache" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
 
 
 

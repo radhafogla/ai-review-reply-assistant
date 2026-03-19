@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabaseClient"
 import { useSubscription } from "@/app/hooks/useSubscription"
@@ -22,6 +22,8 @@ export default function Dashboard() {
   const [historicalBacklogCount, setHistoricalBacklogCount] = useState(0)
   const [historicalBacklogLoaded, setHistoricalBacklogLoaded] = useState(false)
   const [loadingHistoricalBacklog, setLoadingHistoricalBacklog] = useState(false)
+  const hasEnsuredUserRef = useRef(false)
+  const skipNextBusinessFetchRef = useRef(false)
 
   const reviewsNeedingAttention =
     reviews.filter((review) => {
@@ -55,16 +57,8 @@ export default function Dashboard() {
 
   const canBulkActions = hasFeature(subscription.plan, "bulkActions")
 
-  const loadReviews = useCallback(async (businessId?: string, includeHistoricalBacklog = false) => {
-
-    setLoading(true)
-
-    const { data: { session } } = await supabase.auth.getSession()
-
-    const accessToken = session?.access_token
-
-    if (!accessToken) {
-      setHasBusiness(false)
+  const ensureUserRecord = useCallback(async (accessToken: string) => {
+    if (hasEnsuredUserRef.current) {
       return
     }
 
@@ -75,6 +69,25 @@ export default function Dashboard() {
         "Content-Type": "application/json"
       }
     })
+
+    hasEnsuredUserRef.current = true
+  }, [])
+
+  const loadReviews = useCallback(async (businessId?: string, includeHistoricalBacklog = false) => {
+
+    setLoading(true)
+
+    const { data: { session } } = await supabase.auth.getSession()
+
+    const accessToken = session?.access_token
+
+    if (!accessToken) {
+      setHasBusiness(false)
+      setLoading(false)
+      return
+    }
+
+    await ensureUserRecord(accessToken)
 
     const res = await fetch("/api/get-reviews", {
       method: "POST",
@@ -117,11 +130,18 @@ export default function Dashboard() {
       setHistoricalBacklogLoaded(true)
     }
     if (data?.selectedBusinessId) {
-      setSelectedBusinessId((prev) => (prev === data.selectedBusinessId ? prev : data.selectedBusinessId))
+      setSelectedBusinessId((prev) => {
+        if (prev === data.selectedBusinessId) {
+          return prev
+        }
+
+        skipNextBusinessFetchRef.current = true
+        return data.selectedBusinessId
+      })
     }
     setReviews(data.reviews)
     setLoading(false)
-  }, [])
+  }, [ensureUserRecord])
 
   const loadHistoricalBacklog = useCallback(async () => {
     if (historicalBacklogLoaded || loadingHistoricalBacklog) {
@@ -137,6 +157,11 @@ export default function Dashboard() {
   }, [historicalBacklogLoaded, loadingHistoricalBacklog, loadReviews, selectedBusinessId])
 
   useEffect(() => {
+    if (skipNextBusinessFetchRef.current) {
+      skipNextBusinessFetchRef.current = false
+      return
+    }
+
     const run = async () => {
       await loadReviews(selectedBusinessId || undefined, false)
     }

@@ -34,7 +34,7 @@ export default function Hero() {
             </h1>
 
             <p className="mx-auto mb-8 max-w-2xl text-base leading-7 md:text-lg" style={{ color: 'var(--neutral-600)' }}>
-              Revora helps teams manage customer reviews with AI-powered replies, brand voice templates, instant negative-review alerts, and actionable trend detection in one streamlined workflow.
+              Revora helps teams manage customer reviews with AI-powered replies, brand voice templates, instant negative-review alerts, and on-demand sentiment analysis with premium insight layers.
             </p>
 
             <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">

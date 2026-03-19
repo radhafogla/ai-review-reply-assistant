@@ -50,7 +50,7 @@ export const PLAN_FEATURE_ORDER: SubscriptionFeature[] = [
 
 export const PLAN_FEATURE_LABELS: Record<SubscriptionFeature, string> = {
   analytics: "Basic analytics",
-  advancedAnalytics: "Advanced analytics",
+  advancedAnalytics: "Premium insights",
   aiGeneration: "AI reply generation",
   bulkActions: "Bulk generate and post",
   multiBusiness: "Multiple connected businesses",
@@ -68,10 +68,10 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, FeatureMap> = {
   },
   basic: {
     analytics: true,
-    advancedAnalytics: true,
+    advancedAnalytics: false,
     aiGeneration: true,
     bulkActions: true,
-    multiBusiness: false,
+    multiBusiness: true,
     premiumAutoReply: false,
   },
   premium: {
@@ -91,11 +91,11 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
   },
   basic: {
     monthlyAiGenerations: 1000,
-    connectedBusinesses: 1,
+    connectedBusinesses: 5,
   },
   premium: {
     monthlyAiGenerations: 5000,
-    connectedBusinesses: 3,
+    connectedBusinesses: 20,
   },
 }
 
@@ -207,7 +207,7 @@ export function getFeatureGateApiMessage(feature: SubscriptionFeature) {
   }
 
   if (feature === "advancedAnalytics") {
-    return "Advanced analytics is available on Basic and Premium plans"
+    return "Premium insights are available only on the Premium plan"
   }
 
   if (feature === "premiumAutoReply") {
@@ -223,7 +223,7 @@ export function getFeatureGateTitle(feature: SubscriptionFeature) {
   }
 
   if (feature === "advancedAnalytics") {
-    return "Advanced analytics is available on Basic and Premium"
+    return "Premium insights are available on Premium"
   }
 
   if (feature === "premiumAutoReply") {
@@ -239,7 +239,7 @@ export function getFeatureGateUpgradeHint(feature: SubscriptionFeature) {
   }
 
   if (feature === "advancedAnalytics") {
-    return "Upgrade to Basic or Premium to unlock date-range filters and daily trend analysis."
+    return "Upgrade to Premium to unlock recurring themes, AI suggestions, and premium trend views."
   }
 
   if (feature === "premiumAutoReply") {

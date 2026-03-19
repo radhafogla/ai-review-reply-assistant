@@ -109,7 +109,7 @@ export default function SubscriptionsPage() {
 
   return (
     <main style={{ minHeight: "100vh", backgroundColor: "#f8fafc", padding: "32px 24px 40px" }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+      <div style={{ maxWidth: 1280, margin: "0 auto" }}>
         <section
           style={{
             borderRadius: 20,
@@ -149,13 +149,13 @@ export default function SubscriptionsPage() {
           <div style={{ padding: "0 32px 20px" }}>
             <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, backgroundColor: "#f8fafc", padding: 14 }}>
               <p style={{ margin: 0, fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#475569" }}>
-                AI generation limits (per-review)
+                Plan split
               </p>
               <p style={{ margin: "8px 0 0", fontSize: 13, color: "#334155", fontWeight: 600 }}>
-                Max 5 attempts per review
+                Basic includes manual sentiment analysis. Premium adds themes, AI suggestions, and deeper trend views.
               </p>
               <p style={{ margin: "8px 0 0", fontSize: 12, color: "#64748b", fontWeight: 600 }}>
-                You can generate up to 5 different variations for each review. Additional attempts are blocked until you post or delete the current reply.
+                AI reply generation stays capped at 5 attempts per review across all plans.
               </p>
             </div>
           </div>

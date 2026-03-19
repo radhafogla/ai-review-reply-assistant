@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       `*,
       businesses (
         account_id,
-        location_id
+        external_business_id
       )
     `,
     )
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
   const business = review.businesses;
   const accountId = business?.account_id;
-  const locationId = business?.location_id;
+  const locationId = business?.external_business_id;
   const googleReviewId = review.review_id;
 
   const url = `https://mybusiness.googleapis.com/v4/accounts/${accountId}/locations/${locationId}/reviews/${googleReviewId}/reply`;

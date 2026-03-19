@@ -1,4 +1,4 @@
-export interface Location {
+export interface GoogleLocation {
   name: string;
   title: string;
   address: string;

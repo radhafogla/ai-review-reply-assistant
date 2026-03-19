@@ -5,6 +5,8 @@ import { trackUsageEvent } from "@/lib/usageTracking"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
+const SUPPORTED_PLATFORMS = new Set(["google", "yelp", "facebook"])
+
 export async function POST(req: NextRequest) {
   const endpoint = "/api/save-business"
   const requestId = createRequestId()
@@ -26,12 +28,20 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
 
-    const { account_id, location_id, name } = body
-  logApiRequest({ requestId, endpoint, userId: user.id, accountId: account_id, locationId: location_id })
+    const { account_id, external_business_id, platform: rawPlatform, name } = body
+    const platform = typeof rawPlatform === "string" ? rawPlatform.toLowerCase() : "google"
+    logApiRequest({ requestId, endpoint, userId: user.id, accountId: account_id, locationId: external_business_id })
 
-    if (!account_id || !location_id) {
+    if (!account_id || !external_business_id) {
       return NextResponse.json(
         { error: "Missing required fields" },
+        { status: 400 }
+      )
+    }
+
+    if (!SUPPORTED_PLATFORMS.has(platform)) {
+      return NextResponse.json(
+        { error: "Unsupported platform" },
         { status: 400 }
       )
     }
@@ -72,11 +82,12 @@ export async function POST(req: NextRequest) {
         {
           user_id: user.id,
           account_id,
-          location_id,
-          name
+          external_business_id,
+          name,
+          platform,
         },
         {
-          onConflict: "user_id,location_id"
+          onConflict: "user_id,external_business_id,platform"
         }
       )
       .select()
@@ -97,7 +108,7 @@ export async function POST(req: NextRequest) {
       businessId: data.id,
       metadata: {
         accountId: account_id,
-        locationId: location_id,
+        locationId: external_business_id,
         plan,
       },
     })

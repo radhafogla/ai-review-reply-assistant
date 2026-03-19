@@ -43,9 +43,8 @@ SET default_table_access_method = "heap";
 CREATE TABLE IF NOT EXISTS "public"."businesses" (
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
     "user_id" "uuid" NOT NULL,
-    "location_id" "text" NOT NULL,
+    "external_business_id" "text" NOT NULL,
     "name" "text" NOT NULL,
-    "reply_tone" "text" DEFAULT 'professional'::"text",
     "address" "text",
     "phone" "text",
     "connected_at" timestamp with time zone DEFAULT "now"(),
@@ -53,7 +52,10 @@ CREATE TABLE IF NOT EXISTS "public"."businesses" (
     "updated_at" timestamp with time zone DEFAULT "now"(),
     "last_synced_at" timestamp with time zone,
     "sync_status" "text" DEFAULT 'pending'::"text",
-    "sync_error" "text"
+    "sync_error" "text",
+    "reply_tone" "text" DEFAULT 'professional'::"text",
+    "platform" "text" DEFAULT 'google'::"text" NOT NULL,
+    CONSTRAINT "businesses_platform_check" CHECK (("platform" = ANY (ARRAY['google'::"text", 'yelp'::"text", 'facebook'::"text"])))
 );
 
 
@@ -108,9 +110,6 @@ CREATE TABLE IF NOT EXISTS "public"."review_replies" (
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
     "review_id" "uuid",
     "reply_text" "text",
-    "tone_base" "text",
-    "tone_effective" "text",
-    "tone_adapted" boolean DEFAULT false,
     "source" "text",
     "status" "text" DEFAULT 'draft'::"text",
     "created_at" timestamp with time zone DEFAULT "now"(),
@@ -118,6 +117,9 @@ CREATE TABLE IF NOT EXISTS "public"."review_replies" (
     "posted_to_google" boolean DEFAULT false,
     "user_id" "uuid",
     "updated_at" timestamp with time zone DEFAULT "now"(),
+    "tone_base" "text",
+    "tone_effective" "text",
+    "tone_adapted" boolean DEFAULT false,
     CONSTRAINT "review_replies_source_check" CHECK (("source" = ANY (ARRAY['ai'::"text", 'user'::"text", 'system'::"text"]))),
     CONSTRAINT "review_replies_status_check" CHECK (("status" = ANY (ARRAY['draft'::"text", 'approved'::"text", 'posted'::"text", 'failed'::"text", 'deleted'::"text"])))
 );
@@ -140,11 +142,32 @@ CREATE TABLE IF NOT EXISTS "public"."reviews" (
     "needs_ai_reply" boolean DEFAULT true,
     "is_actionable" boolean DEFAULT true,
     "last_ai_attempt_at" timestamp with time zone,
-    "ai_reply_attempts" integer DEFAULT 0
+    "ai_reply_attempts" integer DEFAULT 0,
+    "platform" "text" DEFAULT 'google'::"text" NOT NULL,
+    CONSTRAINT "reviews_platform_check" CHECK (("platform" = ANY (ARRAY['google'::"text", 'yelp'::"text", 'facebook'::"text"])))
 );
 
 
 ALTER TABLE "public"."reviews" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."sentiment_cache" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "business_id" "uuid" NOT NULL,
+    "analyzed_review_count" integer NOT NULL,
+    "analyzed_at" timestamp with time zone NOT NULL,
+    "sentiment_positive" integer DEFAULT 0,
+    "sentiment_neutral" integer DEFAULT 0,
+    "sentiment_negative" integer DEFAULT 0,
+    "themes" "jsonb" DEFAULT '{}'::"jsonb",
+    "suggestions" "jsonb" DEFAULT '{}'::"jsonb",
+    "sentiment_trend_by_day" "jsonb" DEFAULT '{}'::"jsonb",
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"()
+);
+
+
+ALTER TABLE "public"."sentiment_cache" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."subscriptions" (
@@ -186,10 +209,11 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
     "trial_start" timestamp with time zone DEFAULT "now"(),
     "trial_end" timestamp with time zone,
     "plan" "text" DEFAULT 'free'::"text",
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"(),
     "premium_auto_reply_enabled" boolean DEFAULT false NOT NULL,
     "premium_auto_reply_min_rating" integer DEFAULT 5 NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "updated_at" timestamp with time zone DEFAULT "now"()
+    CONSTRAINT "users_premium_auto_reply_min_rating_check" CHECK ((("premium_auto_reply_min_rating" >= 1) AND ("premium_auto_reply_min_rating" <= 5)))
 );
 
 
@@ -198,6 +222,11 @@ ALTER TABLE "public"."users" OWNER TO "postgres";
 
 ALTER TABLE ONLY "public"."businesses"
     ADD CONSTRAINT "businesses_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."businesses"
+    ADD CONSTRAINT "businesses_user_platform_unique" UNIQUE ("user_id", "external_business_id", "platform");
 
 
 
@@ -228,6 +257,11 @@ ALTER TABLE ONLY "public"."reviews"
 
 ALTER TABLE ONLY "public"."reviews"
     ADD CONSTRAINT "reviews_review_id_key" UNIQUE ("review_id");
+
+
+
+ALTER TABLE ONLY "public"."sentiment_cache"
+    ADD CONSTRAINT "sentiment_cache_pkey" PRIMARY KEY ("id");
 
 
 
@@ -276,6 +310,10 @@ CREATE INDEX "idx_reviews_time" ON "public"."reviews" USING "btree" ("review_tim
 
 
 
+CREATE INDEX "idx_sentiment_cache_business_latest" ON "public"."sentiment_cache" USING "btree" ("business_id", "analyzed_at" DESC);
+
+
+
 CREATE INDEX "idx_usage_events_business" ON "public"."usage_events" USING "btree" ("business_id");
 
 
@@ -289,6 +327,10 @@ CREATE INDEX "idx_usage_events_user" ON "public"."usage_events" USING "btree" ("
 
 
 CREATE UNIQUE INDEX "review_ai_unique" ON "public"."review_replies" USING "btree" ("review_id", "source", "status");
+
+
+
+CREATE OR REPLACE TRIGGER "set_sentiment_cache_updated_at" BEFORE UPDATE ON "public"."sentiment_cache" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
 
 
 
@@ -509,6 +551,11 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."review_replies" TO "authent
 
 GRANT ALL ON TABLE "public"."reviews" TO "service_role";
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."reviews" TO "authenticated";
+
+
+
+GRANT ALL ON TABLE "public"."sentiment_cache" TO "authenticated";
+GRANT ALL ON TABLE "public"."sentiment_cache" TO "service_role";
 
 
 

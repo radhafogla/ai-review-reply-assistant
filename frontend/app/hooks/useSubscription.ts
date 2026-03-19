@@ -18,6 +18,22 @@ type SubscriptionState = {
   warnings: LimitWarning[]
 }
 
+let cachedSubscriptionState: SubscriptionState | null = null
+let inFlightSubscriptionRequest: Promise<SubscriptionState> | null = null
+
+function createFallbackSubscriptionState(): SubscriptionState {
+  return {
+    plan: DEFAULT_SUBSCRIPTION_PLAN,
+    status: "active",
+    trialEnd: null,
+    trialExpired: false,
+    trialDaysRemaining: null,
+    limits: createDefaultPlanLimits(),
+    usage: createDefaultPlanUsage(),
+    warnings: [],
+  }
+}
+
 function toSubscriptionState(data: unknown): SubscriptionState {
   const payload = (data ?? {}) as {
     plan?: unknown
@@ -55,34 +71,19 @@ function toSubscriptionState(data: unknown): SubscriptionState {
   }
 }
 
-export function useSubscription() {
-  const defaultLimits = createDefaultPlanLimits()
-  const defaultUsage = createDefaultPlanUsage()
+async function fetchSubscriptionState(): Promise<SubscriptionState> {
+  if (inFlightSubscriptionRequest) {
+    return inFlightSubscriptionRequest
+  }
 
-  const [loading, setLoading] = useState(true)
-  const [subscription, setSubscription] = useState<SubscriptionState>({
-    plan: DEFAULT_SUBSCRIPTION_PLAN,
-    status: "active",
-    trialEnd: null,
-    trialExpired: false,
-    trialDaysRemaining: null,
-    limits: defaultLimits,
-    usage: defaultUsage,
-    warnings: [],
-  })
-
-  const refresh = useCallback(async () => {
-    setLoading(true)
-
+  inFlightSubscriptionRequest = (async () => {
     const {
       data: { session },
     } = await supabase.auth.getSession()
 
     const token = session?.access_token
     if (!token) {
-      setSubscription(toSubscriptionState({}))
-      setLoading(false)
-      return
+      return createFallbackSubscriptionState()
     }
 
     try {
@@ -96,16 +97,42 @@ export function useSubscription() {
       const data = await res.json()
 
       if (!res.ok) {
-        setSubscription(toSubscriptionState({}))
-        return
+        return createFallbackSubscriptionState()
       }
 
-      setSubscription(toSubscriptionState(data))
+      return toSubscriptionState(data)
     } catch {
-      setSubscription(toSubscriptionState({}))
-    } finally {
-      setLoading(false)
+      return createFallbackSubscriptionState()
     }
+  })()
+
+  try {
+    const nextState = await inFlightSubscriptionRequest
+    cachedSubscriptionState = nextState
+    return nextState
+  } finally {
+    inFlightSubscriptionRequest = null
+  }
+}
+
+export function useSubscription() {
+  const initialState = cachedSubscriptionState ?? createFallbackSubscriptionState()
+
+  const [loading, setLoading] = useState(!cachedSubscriptionState)
+  const [subscription, setSubscription] = useState<SubscriptionState>(initialState)
+
+  const refresh = useCallback(async (force = false) => {
+    if (!force && cachedSubscriptionState) {
+      setSubscription(cachedSubscriptionState)
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+
+    const nextState = await fetchSubscriptionState()
+    setSubscription(nextState)
+    setLoading(false)
   }, [])
 
   const changePlan = useCallback(async (plan: SubscriptionPlan) => {
@@ -134,6 +161,7 @@ export function useSubscription() {
     }
 
     const nextState = toSubscriptionState(data)
+    cachedSubscriptionState = nextState
 
     setSubscription(nextState)
 
@@ -152,6 +180,7 @@ export function useSubscription() {
     const handleSubscriptionUpdated = (event: Event) => {
       const customEvent = event as CustomEvent<SubscriptionState>
       if (customEvent.detail) {
+        cachedSubscriptionState = customEvent.detail
         setSubscription(customEvent.detail)
       }
     }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { useSubscription } from "@/app/hooks/useSubscription"
 import { getFeatureGateUpgradeHint, hasFeature } from "@/lib/subscription"
@@ -56,6 +56,22 @@ type SentimentCache = {
   themes: Record<string, { count: number; mentions: string[] }>
   suggestions: { focus_areas: string[]; strengths: string[] }
   sentiment_trend_by_day: Record<string, { positive: number; neutral: number; negative: number }>
+}
+
+type SentimentTrendPoint = {
+  dateKey: string
+  label: string
+  positive: number
+  neutral: number
+  negative: number
+}
+
+type ThemeSentimentContext = {
+  emoji: string
+  label: string
+  toneColor: string
+  bgColor: string
+  borderColor: string
 }
 
 function PieChart({ title, data, palette }: { title: string; data: Bucket[]; palette: string[] }) {
@@ -171,6 +187,112 @@ function TrendBars({ title, data, color }: { title: string; data: Bucket[]; colo
   )
 }
 
+function PremiumInsightCard({
+  eyebrow,
+  title,
+  body,
+  whyThisMatters,
+}: {
+  eyebrow: string
+  title: string
+  body: string
+  whyThisMatters?: string
+}) {
+  return (
+    <div
+      style={{
+        borderRadius: 16,
+        border: "1px solid #dbe4ff",
+        background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)",
+        padding: 16,
+      }}
+    >
+      <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "#4f46e5" }}>
+        {eyebrow}
+      </div>
+      <div style={{ marginTop: 8, fontSize: 16, fontWeight: 800, color: "#0f172a" }}>{title}</div>
+      <p style={{ margin: "8px 0 0", fontSize: 13, lineHeight: 1.6, color: "#475569" }}>{body}</p>
+    </div>
+  )
+}
+
+function StackedSentimentTrend({ title, data }: { title: string; data: SentimentTrendPoint[] }) {
+  const max = Math.max(
+    ...data.map((point) => point.positive + point.neutral + point.negative),
+    1,
+  )
+
+  return (
+    <div style={{ borderRadius: 16, border: "1px solid #e2e8f0", backgroundColor: "#ffffff", padding: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "#0f172a" }}>{title}</h3>
+          <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>Daily sentiment mix across the most recent 30 days.</p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569", fontWeight: 700 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 999, backgroundColor: "#22c55e", display: "inline-block" }} />
+            Positive
+          </span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569", fontWeight: 700 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 999, backgroundColor: "#f59e0b", display: "inline-block" }} />
+            Neutral
+          </span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569", fontWeight: 700 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 999, backgroundColor: "#ef4444", display: "inline-block" }} />
+            Negative
+          </span>
+        </div>
+      </div>
+
+      {data.length === 0 ? (
+        <p style={{ margin: "16px 0 0", fontSize: 13, color: "#64748b" }}>No trend data yet.</p>
+      ) : (
+        <>
+          <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))`, gap: 8, alignItems: "end", height: 220 }}>
+            {data.map((point) => {
+              const total = point.positive + point.neutral + point.negative
+              const stackHeight = Math.max(16, Math.round((total / max) * 100))
+              const positivePct = total === 0 ? 0 : (point.positive / total) * 100
+              const neutralPct = total === 0 ? 0 : (point.neutral / total) * 100
+              const negativePct = total === 0 ? 0 : (point.negative / total) * 100
+
+              return (
+                <div key={point.label} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "end", gap: 8 }}>
+                  <span style={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>{total}</span>
+                  <div
+                    title={`${point.label}: ${point.positive} positive, ${point.neutral} neutral, ${point.negative} negative`}
+                    style={{
+                      width: "100%",
+                      minWidth: 10,
+                      height: `${stackHeight}%`,
+                      borderRadius: 999,
+                      overflow: "hidden",
+                      backgroundColor: "#e2e8f0",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "flex-end",
+                    }}
+                  >
+                    {negativePct > 0 && <div style={{ height: `${negativePct}%`, backgroundColor: "#ef4444" }} />}
+                    {neutralPct > 0 && <div style={{ height: `${neutralPct}%`, backgroundColor: "#f59e0b" }} />}
+                    {positivePct > 0 && <div style={{ height: `${positivePct}%`, backgroundColor: "#22c55e" }} />}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", fontSize: 11, color: "#64748b", fontWeight: 700 }}>
+            <span>{data[0]?.label ?? ""}</span>
+            <span>{data[data.length - 1]?.label ?? ""}</span>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function AnalyticsPage() {
   const { loading: subscriptionLoading, subscription } = useSubscription()
   const [hasBusiness, setHasBusiness] = useState(true)
@@ -184,8 +306,9 @@ export default function AnalyticsPage() {
   const [sentimentCache, setSentimentCache] = useState<SentimentCache | null>(null)
   const [sentimentLoading, setSentimentLoading] = useState(false)
   const [isStale, setIsStale] = useState(false)
+  const skipNextBusinessFetchRef = useRef(false)
 
-  const canUseAdvancedAnalytics = hasFeature(subscription.plan, "advancedAnalytics")
+  const canUsePremiumInsights = hasFeature(subscription.plan, "advancedAnalytics")
 
   const loadAnalytics = useCallback(async (businessId?: string, range?: { preset: DateRangePreset; startDate?: string; endDate?: string }) => {
     setLoading(true)
@@ -232,7 +355,14 @@ export default function AnalyticsPage() {
     setHasBusiness(true)
     setBusinesses(nextBusinesses)
     if (data?.selectedBusinessId) {
-      setSelectedBusinessId((prev) => (prev === data.selectedBusinessId ? prev : data.selectedBusinessId))
+      setSelectedBusinessId((prev) => {
+        if (prev === data.selectedBusinessId) {
+          return prev
+        }
+
+        skipNextBusinessFetchRef.current = true
+        return data.selectedBusinessId
+      })
     }
     setAnalytics(data?.analytics ?? null)
     setLoading(false)
@@ -302,13 +432,18 @@ export default function AnalyticsPage() {
   }, [selectedBusinessId])
 
   useEffect(() => {
-    if (subscriptionLoading) return
-
-    if (canUseAdvancedAnalytics && rangePreset === "custom" && (!customStartDate || !customEndDate)) {
+    if (skipNextBusinessFetchRef.current) {
+      skipNextBusinessFetchRef.current = false
       return
     }
 
-    const activeRange = canUseAdvancedAnalytics
+    if (subscriptionLoading) return
+
+    if (canUsePremiumInsights && rangePreset === "custom" && (!customStartDate || !customEndDate)) {
+      return
+    }
+
+    const activeRange = canUsePremiumInsights
       ? {
           preset: rangePreset,
           startDate: rangePreset === "custom" ? customStartDate : undefined,
@@ -320,7 +455,7 @@ export default function AnalyticsPage() {
       await loadAnalytics(selectedBusinessId || undefined, activeRange)
     }
     run()
-  }, [selectedBusinessId, loadAnalytics, subscriptionLoading, canUseAdvancedAnalytics, rangePreset, customStartDate, customEndDate])
+  }, [selectedBusinessId, loadAnalytics, subscriptionLoading, canUsePremiumInsights, rangePreset, customStartDate, customEndDate])
 
   useEffect(() => {
     if (selectedBusinessId && analytics?.totals?.reviews) {
@@ -334,6 +469,92 @@ export default function AnalyticsPage() {
   const premium = analytics?.premium
   const isPremiumPlan = (totals?.plan || subscription.plan).toLowerCase() === "premium"
   const advanced = analytics?.advanced
+  const totalReviews = totals?.reviews ?? 0
+  const analyzedReviewCount = sentimentCache?.analyzed_review_count ?? 0
+  const hasSentimentCache = Boolean(sentimentCache)
+  const newReviewsCount = Math.max(0, totalReviews - analyzedReviewCount)
+  const isReanalyzeDisabled = sentimentLoading || (hasSentimentCache && !isStale)
+  const sortedTrendData: SentimentTrendPoint[] = Object.entries(sentimentCache?.sentiment_trend_by_day ?? {})
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([date, counts]) => ({
+      dateKey: date,
+      label: new Date(date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+      positive: counts.positive ?? 0,
+      neutral: counts.neutral ?? 0,
+      negative: counts.negative ?? 0,
+    }))
+    .slice(-30)
+  const topThemes = Object.entries(sentimentCache?.themes ?? {})
+    .sort(([, left], [, right]) => (right.count ?? 0) - (left.count ?? 0))
+    .slice(0, 6)
+  const focusAreas = sentimentCache?.suggestions?.focus_areas ?? []
+  const strengths = sentimentCache?.suggestions?.strengths ?? []
+  const normalizedFocusAreas = focusAreas.map((value) => value.toLowerCase())
+  const normalizedStrengths = strengths.map((value) => value.toLowerCase())
+  const primaryTheme = topThemes[0]
+  const primaryFocusTitle = primaryTheme
+    ? `Fix ${primaryTheme[0]} concerns (mentioned in ${Math.round((primaryTheme[1].count / Math.max(analyzedReviewCount, 1)) * 100)}% of analyzed reviews)`
+    : (focusAreas[0] ?? "No primary focus detected yet")
+
+  const recent14Trend = sortedTrendData.slice(-14)
+  const getNegativeShare = (points: SentimentTrendPoint[]) => {
+    const totals = points.reduce(
+      (acc, point) => {
+        acc.negative += point.negative
+        acc.total += point.positive + point.neutral + point.negative
+        return acc
+      },
+      { negative: 0, total: 0 },
+    )
+    return totals.total > 0 ? (totals.negative / totals.total) * 100 : 0
+  }
+  const recentNegativeShare = getNegativeShare(recent14Trend)
+
+  const getThemeSentimentContext = (theme: string): ThemeSentimentContext => {
+    const normalizedTheme = theme.toLowerCase()
+    const isNegativeTheme = normalizedFocusAreas.some((focus) => focus.includes(normalizedTheme) || normalizedTheme.includes(focus))
+    const isPositiveTheme = normalizedStrengths.some((strength) => strength.includes(normalizedTheme) || normalizedTheme.includes(strength))
+
+    if (isNegativeTheme) {
+      return {
+        emoji: "🔴",
+        label: "Mostly negative",
+        toneColor: "#991b1b",
+        bgColor: "#fff1f2",
+        borderColor: "#fecdd3",
+      }
+    }
+
+    if (isPositiveTheme) {
+      return {
+        emoji: "🟢",
+        label: "Mostly positive",
+        toneColor: "#166534",
+        bgColor: "#f0fdf4",
+        borderColor: "#bbf7d0",
+      }
+    }
+
+    return {
+      emoji: "🟡",
+      label: "Mixed sentiment",
+      toneColor: "#92400e",
+      bgColor: "#fffbeb",
+      borderColor: "#fde68a",
+    }
+  }
+
+  const reviewsByDay = advanced?.trends.reviewsByDay ?? []
+  const repliesByDay = advanced?.trends.postedRepliesByDay ?? []
+  const repliesByLabel = new Map(repliesByDay.map((bucket) => [bucket.label, bucket.value]))
+  const replyCoverageByDay: Bucket[] = reviewsByDay.map((reviewBucket) => {
+    const repliesForDay = repliesByLabel.get(reviewBucket.label) ?? 0
+    const coverage = reviewBucket.value > 0 ? Math.round((repliesForDay / reviewBucket.value) * 100) : 0
+    return {
+      label: reviewBucket.label,
+      value: coverage,
+    }
+  })
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc" }}>
@@ -391,7 +612,7 @@ export default function AnalyticsPage() {
             </div>
 
             <div style={{ marginTop: 12 }}>
-              {canUseAdvancedAnalytics ? (
+              {canUsePremiumInsights ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: "#334155", textTransform: "uppercase", letterSpacing: "0.08em" }}>Range</span>
                   <select
@@ -493,27 +714,34 @@ export default function AnalyticsPage() {
             <div>
               <h2 style={{ margin: 0, fontSize: 20, color: "#0f172a", fontWeight: 800 }}>Sentiment analysis</h2>
               <p style={{ marginTop: 6, marginBottom: 0, color: "#64748b", fontSize: 13 }}>
-                AI-powered sentiment breakdown of all reviews
+                Manual analysis for Basic and Premium. Premium adds deeper AI insight cards and trend views.
               </p>
             </div>
 
-            <button
-              onClick={() => handleAnalyzeSentiment(isStale)}
-              disabled={sentimentLoading}
-              style={{
-                padding: "10px 16px",
-                borderRadius: 10,
-                border: "1.5px solid #e2e8f0",
-                backgroundColor: sentimentLoading ? "#e2e8f0" : "#ffffff",
-                color: sentimentLoading ? "#94a3b8" : "#0f172a",
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: sentimentLoading ? "default" : "pointer",
-                transition: "all 0.2s"
-              }}
-            >
-              {sentimentLoading ? "Analyzing..." : isStale ? "Refresh Analysis" : sentimentCache ? "Re-analyze" : "Analyze Reviews"}
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              {hasSentimentCache && !isStale && (
+                <span style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>
+                  Re-analyze unlocks when new reviews are synced.
+                </span>
+              )}
+              <button
+                onClick={() => handleAnalyzeSentiment(isStale)}
+                disabled={isReanalyzeDisabled}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 10,
+                  border: "1.5px solid #e2e8f0",
+                  backgroundColor: isReanalyzeDisabled ? "#e2e8f0" : "#ffffff",
+                  color: isReanalyzeDisabled ? "#94a3b8" : "#0f172a",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: isReanalyzeDisabled ? "not-allowed" : "pointer",
+                  transition: "all 0.2s"
+                }}
+              >
+                {sentimentLoading ? "Analyzing..." : isStale ? "Re-analyze" : sentimentCache ? "Up to date" : "Analyze Reviews"}
+              </button>
+            </div>
           </div>
 
           {isStale && sentimentCache && (
@@ -527,7 +755,7 @@ export default function AnalyticsPage() {
               <p style={{ margin: 0, fontSize: 13, color: "#92400e", fontWeight: 600 }}>
                 ⚠️ Last analyzed: {new Date(sentimentCache.analyzed_at).toLocaleString()}
                 <br />
-                {sentimentCache.analyzed_review_count} reviews analyzed, {(totals?.reviews ?? 0) - sentimentCache.analyzed_review_count} new reviews since then
+                {sentimentCache.analyzed_review_count} reviews analyzed, {newReviewsCount} new reviews since then
               </p>
             </div>
           )}
@@ -558,7 +786,7 @@ export default function AnalyticsPage() {
               color: "#1e40af",
               fontWeight: 600
             }}>
-              Click "Analyze Reviews" to compute sentiment insights
+              Click Analyze Reviews to compute sentiment insights
             </div>
           )}
         </section>
@@ -600,103 +828,136 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Premium Sentiment Features */}
-        {canUseAdvancedAnalytics && sentimentCache && (
-          <section style={{ marginTop: 20 }}>
-            <div style={{ marginBottom: 14 }}>
-              <h2 style={{ margin: 0, fontSize: 20, color: "#0f172a", fontWeight: 800 }}>Premium insights</h2>
-              <p style={{ marginTop: 6, marginBottom: 0, color: "#64748b", fontSize: 13 }}>
-                Deep analysis: key themes, AI suggestions, and sentiment trends
+        {canUsePremiumInsights && sentimentCache && (
+          <section style={{
+            marginTop: 20,
+            borderRadius: 20,
+            overflow: "hidden",
+            border: "1px solid #e2e8f0",
+            backgroundColor: "#ffffff",
+            boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
+          }}>
+            <div style={{ backgroundColor: "#0f172a", padding: "24px 32px" }}>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "#a5b4fc", margin: 0 }}>
+                Premium analytics
+              </p>
+              <h2 style={{ fontSize: 30, fontWeight: 800, color: "#ffffff", margin: "8px 0 0", letterSpacing: "-0.4px" }}>
+                Premium Insight Layer
+              </h2>
+              <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 6, maxWidth: 700 }}>
+                Recurring themes, AI recommended actions, and sentiment movement context beyond the standard sentiment split.
               </p>
             </div>
 
-            <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
-              {/* Themes */}
-              {Object.keys(sentimentCache.themes ?? {}).length > 0 && (
-                <div style={{ borderRadius: 14, border: "1.5px solid #e2e8f0", backgroundColor: "#ffffff", padding: 16 }}>
-                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f172a" }}>Key themes</h3>
-                  <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
-                    {Object.entries(sentimentCache.themes ?? {}).map(([theme, data]) => (
-                      <div key={theme} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                        <span style={{ fontSize: 13, color: "#334155", fontWeight: 600, textTransform: "capitalize" }}>
-                          {theme}
-                        </span>
-                        <span style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>
-                          {(data as any)?.count ?? 0} mentions
-                        </span>
+            <div style={{ padding: "24px 32px" }}>
+              <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", marginBottom: 16 }}>
+                <PremiumInsightCard
+                  eyebrow="Coverage"
+                  title={`${analyzedReviewCount} reviews analyzed`}
+                  body="Premium insights summarize the analyzed review set, so your theme and suggestion cards stay grounded in the same cached snapshot."
+                />
+                <PremiumInsightCard
+                  eyebrow="Primary focus"
+                  title={primaryFocusTitle}
+                  body="This is the top operational issue recurring in your latest analyzed review set."
+                  whyThisMatters={recentNegativeShare > 0 ? `Negative sentiment currently sits at ${Math.round(recentNegativeShare)}%, so resolving this issue can move overall sentiment faster.` : "Addressing recurring issues helps prevent new negative review clusters."}
+                />
+                <PremiumInsightCard
+                  eyebrow="Strongest signal"
+                  title={topThemes[0] ? `${topThemes[0][0]} (${topThemes[0][1].count})` : "No recurring theme yet"}
+                  body="Recurring topics help you separate one-off comments from repeated customer experience issues."
+                />
+              </div>
+
+              <div style={{ display: "grid", gap: 16, gridTemplateColumns: "minmax(0, 1.1fr) minmax(0, 0.9fr)" }}>
+                <div style={{ display: "grid", gap: 16 }}>
+                  {topThemes.length > 0 && (
+                    <div style={{ borderRadius: 16, border: "1px solid #e2e8f0", backgroundColor: "#ffffff", padding: 18 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "#0f172a" }}>Recurring themes</h3>
+                          <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>Most-mentioned topics found in the latest analysis snapshot.</p>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Suggestions */}
-              {(sentimentCache.suggestions?.focus_areas?.length || 0) > 0 && (
-                <div style={{ borderRadius: 14, border: "1.5px solid #e2e8f0", backgroundColor: "#ffffff", padding: 16 }}>
-                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f172a" }}>AI suggestions</h3>
-
-                  <div style={{ marginTop: 12 }}>
-                    <div style={{ marginBottom: 12 }}>
-                      <p style={{ margin: 0, fontSize: 12, color: "#64748b", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                        Focus areas
-                      </p>
-                      <ul style={{ margin: "8px 0 0 0", paddingLeft: 20, color: "#334155", fontSize: 13, fontWeight: 500 }}>
-                        {(sentimentCache.suggestions?.focus_areas ?? []).map((area, idx) => (
-                          <li key={idx}>{area}</li>
-                        ))}
-                      </ul>
+                      <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
+                        {topThemes.map(([theme, data]) => {
+                          const context = getThemeSentimentContext(theme)
+                          return (
+                            <div key={theme} style={{ display: "grid", gap: 6 }}>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                                <span style={{ fontSize: 13, color: "#0f172a", fontWeight: 700, textTransform: "capitalize" }}>{theme}</span>
+                                <span style={{ fontSize: 12, color: "#6366f1", fontWeight: 800 }}>{data.count} mentions</span>
+                              </div>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: context.toneColor }}>
+                                {`${theme} -> ${context.emoji} ${context.label}`}
+                              </div>
+                              <div style={{ height: 8, borderRadius: 999, backgroundColor: "#e2e8f0", overflow: "hidden" }}>
+                                <div
+                                  style={{
+                                    height: "100%",
+                                    width: `${Math.max(8, Math.round((data.count / Math.max(topThemes[0]?.[1].count ?? 1, 1)) * 100))}%`,
+                                    borderRadius: 999,
+                                    background: "linear-gradient(90deg, #6366f1 0%, #818cf8 100%)",
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
+                  )}
 
-                    <div>
-                      <p style={{ margin: 0, fontSize: 12, color: "#64748b", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                        Strengths
-                      </p>
-                      <ul style={{ margin: "8px 0 0 0", paddingLeft: 20, color: "#334155", fontSize: 13, fontWeight: 500 }}>
-                        {(sentimentCache.suggestions?.strengths ?? []).map((strength, idx) => (
-                          <li key={idx}>{strength}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
+                  <StackedSentimentTrend title="Sentiment movement" data={sortedTrendData} />
                 </div>
-              )}
-            </div>
 
-            {/* Sentiment Trends */}
-            {Object.keys(sentimentCache.sentiment_trend_by_day ?? {}).length > 0 && (
-              <div style={{ marginTop: 16 }}>
-                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f172a", marginBottom: 12 }}>
-                  Sentiment trends (30 days)
-                </h3>
-                <div style={{ borderRadius: 14, border: "1.5px solid #e2e8f0", backgroundColor: "#ffffff", padding: 16 }}>
-                  <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
-                    {/* Positive trend */}
-                    <TrendBars
-                      title="Positive reviews by day"
-                      data={Object.entries(sentimentCache.sentiment_trend_by_day ?? {})
-                        .map(([date, counts]) => ({ label: date, value: (counts as any).positive ?? 0 }))
-                        .filter(b => new Date(b.label).getTime() >= Date.now() - 30 * 24 * 60 * 60 * 1000)}
-                      color="#22c55e"
-                    />
+                <div style={{ display: "grid", gap: 16 }}>
+                  <div style={{ borderRadius: 16, border: "1px solid #e2e8f0", backgroundColor: "#ffffff", padding: 18 }}>
+                    <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "#0f172a" }}>AI Recommended actions</h3>
+                    <p style={{ margin: "6px 0 0", fontSize: 12, color: "#64748b" }}>Use these cues to decide where to respond, retrain staff, or adjust operations.</p>
 
-                    {/* Negative trend */}
-                    <TrendBars
-                      title="Negative reviews by day"
-                      data={Object.entries(sentimentCache.sentiment_trend_by_day ?? {})
-                        .map(([date, counts]) => ({ label: date, value: (counts as any).negative ?? 0 }))
-                        .filter(b => new Date(b.label).getTime() >= Date.now() - 30 * 24 * 60 * 60 * 1000)}
-                      color="#ef4444"
-                    />
+                    <div style={{ marginTop: 16, display: "grid", gap: 14 }}>
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "#ef4444" }}>Focus areas</div>
+                        {(sentimentCache.suggestions?.focus_areas?.length ?? 0) > 0 ? (
+                          <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+                            {(sentimentCache.suggestions?.focus_areas ?? []).map((area, idx) => (
+                              <div key={idx} style={{ borderRadius: 12, backgroundColor: "#fff7ed", border: "1px solid #fdba74", padding: "10px 12px", fontSize: 13, color: "#9a3412", fontWeight: 600 }}>
+                                {area}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p style={{ margin: "10px 0 0", fontSize: 13, color: "#64748b" }}>No focus areas were surfaced in this analysis yet.</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "#16a34a" }}>Strengths</div>
+                        {(sentimentCache.suggestions?.strengths?.length ?? 0) > 0 ? (
+                          <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+                            {(sentimentCache.suggestions?.strengths ?? []).map((strength, idx) => (
+                              <div key={idx} style={{ borderRadius: 12, backgroundColor: "#f0fdf4", border: "1px solid #86efac", padding: "10px 12px", fontSize: 13, color: "#166534", fontWeight: 600 }}>
+                                {strength}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p style={{ margin: "10px 0 0", fontSize: 13, color: "#64748b" }}>No standout strengths were surfaced in this analysis yet.</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            )}
+            </div>
           </section>
         )}
 
-        {canUseAdvancedAnalytics && (
+        {canUsePremiumInsights && (
           <section style={{ marginTop: 20 }}>
             <div style={{ marginBottom: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 20, color: "#0f172a", fontWeight: 800 }}>Advanced trends</h2>
+              <h2 style={{ margin: 0, fontSize: 20, color: "#0f172a", fontWeight: 800 }}>Premium trend views</h2>
               <p style={{ marginTop: 6, marginBottom: 0, color: "#64748b", fontSize: 13 }}>
                 Daily movement across reviews, posted replies, and negative sentiment.
               </p>
@@ -706,6 +967,7 @@ export default function AnalyticsPage() {
               <TrendBars title="Reviews by day" data={advanced?.trends.reviewsByDay ?? []} color="#3b82f6" />
               <TrendBars title="Posted replies by day" data={advanced?.trends.postedRepliesByDay ?? []} color="#059669" />
               <TrendBars title="Negative sentiment by day" data={advanced?.trends.negativeSentimentByDay ?? []} color="#ef4444" />
+              <TrendBars title="Reply coverage by day (%)" data={replyCoverageByDay} color="#8b5cf6" />
             </div>
           </section>
         )}

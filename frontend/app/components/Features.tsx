@@ -35,7 +35,7 @@ export default function Features() {
     },
     {
       title: "Sentiment Radar",
-      desc: "Understand customer tone at a glance.",
+      desc: "Run manual analysis across synced reviews and cache a fresh sentiment breakdown.",
       status: "Live now",
     },
     {
@@ -50,8 +50,8 @@ export default function Features() {
     },
     {
       title: "Action Coach",
-      desc: "Get practical suggestions from feedback patterns.",
-      status: "Coming soon",
+      desc: "Premium analytics turn recurring review themes into AI suggestions and trend views.",
+      status: "Live now",
     },
   ]
 
@@ -87,11 +87,11 @@ export default function Features() {
     },
     {
       title: "Understand",
-      desc: "Break down sentiment, intent, and recurring themes across your feedback.",
+      desc: "Break down sentiment on demand and unlock recurring themes and premium insight layers as your review set grows.",
     },
     {
       title: "Improve",
-      desc: "Apply AI suggestions to fix root issues and boost customer happiness over time.",
+      desc: "Apply AI suggestions from premium analytics to fix root issues and boost customer happiness over time.",
     },
   ]
 
@@ -109,7 +109,7 @@ export default function Features() {
           </h2>
 
           <p className="mx-auto max-w-2xl text-base leading-7 md:text-lg" style={{ color: 'var(--neutral-600)' }}>
-            One dashboard for managing reviews, applying your brand voice, and acting quickly when negative feedback arrives.
+            One dashboard for managing reviews, applying your brand voice, running manual sentiment analysis, and acting quickly when negative feedback arrives.
           </p>
         </div>
 
