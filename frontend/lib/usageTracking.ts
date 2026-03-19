@@ -14,6 +14,7 @@ export type UsageEventType =
   | "reply_posted"
   | "reply_saved"
   | "reviews_synced"
+  | "sentiment_analysis_performed"
   | "subscription_changed"
 
 type UsageMetadata = Record<string, unknown>

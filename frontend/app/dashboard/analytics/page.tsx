@@ -191,12 +191,10 @@ function PremiumInsightCard({
   eyebrow,
   title,
   body,
-  whyThisMatters,
 }: {
   eyebrow: string
   title: string
   body: string
-  whyThisMatters?: string
 }) {
   return (
     <div

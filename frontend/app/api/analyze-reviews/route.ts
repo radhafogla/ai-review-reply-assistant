@@ -5,6 +5,7 @@ import { createServerClient } from "@/lib/supabaseServerClient"
 import { hasFeature } from "@/lib/subscription"
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
 import { trackUsageEvent } from "@/lib/usageTracking"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -12,16 +13,36 @@ const openai = new OpenAI({
 
 type SentimentCount = { positive: number; neutral: number; negative: number }
 
+type ReviewAnalysis = {
+  sentiment: string
+  priority: string
+  topics: string[]
+  summary: string
+  suggested_tone: string
+}
+
+type Review = {
+  id: string
+  review_text: string | null
+  rating: number | null
+  review_time: string | null
+  created_at: string
+}
+
+type Topics = Record<string, { count: number; mentions: string[] }>
+type Suggestions = { focus_areas: string[]; strengths: string[] }
+type SentimentTrend = Record<string, SentimentCount>
+
 function formatYmd(date: Date): string {
   return date.toISOString().slice(0, 10)
 }
 
 async function ensureReviewAnalyzed(
-  supabase: any,
+  supabase: SupabaseClient,
   reviewId: string,
   reviewText: string,
   rating: number
-): Promise<{ sentiment: string; priority: string; topics: string[]; summary: string; suggested_tone: string }> {
+): Promise<ReviewAnalysis> {
   // Check if already analyzed
   const { data: existing } = await supabase
     .from("review_analysis")
@@ -71,7 +92,7 @@ Rating: ${rating}
   return analysis
 }
 
-function extractTopics(analyses: any[]): Record<string, { count: number; mentions: string[] }> {
+function extractTopics(analyses: ReviewAnalysis[]): Topics {
   const topicMap = new Map<string, { count: number; mentions: string[] }>()
 
   for (const analysis of analyses) {
@@ -98,11 +119,11 @@ function extractTopics(analyses: any[]): Record<string, { count: number; mention
 }
 
 async function generateSuggestions(
-  supabase: any,
-  reviews: any[],
-  analyses: any[],
+  supabase: SupabaseClient,
+  reviews: Review[],
+  analyses: ReviewAnalysis[],
   sentimentCounts: SentimentCount
-): Promise<{ focus_areas: string[]; strengths: string[] }> {
+): Promise<Suggestions> {
   const negativeAnalyses = analyses.filter((a) => (a.sentiment || "").toLowerCase() === "negative")
   const positiveAnalyses = analyses.filter((a) => (a.sentiment || "").toLowerCase() === "positive")
 
@@ -137,9 +158,9 @@ Be concise and actionable.
 }
 
 function compute30DaySentimentTrend(
-  reviews: any[],
-  analyses: any[]
-): Record<string, { positive: number; neutral: number; negative: number }> {
+  reviews: Review[],
+  analyses: ReviewAnalysis[]
+): SentimentTrend {
   const analysisMap = new Map(analyses.map((a) => [a.review_id, a]))
   const trendMap = new Map<string, SentimentCount>()
 
@@ -311,9 +332,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    let themes: any = {}
-    let suggestions: any = {}
-    let sentimentTrendByDay: any = {}
+    let themes: Topics = {}
+    let suggestions: Suggestions = { focus_areas: [], strengths: [] }
+    let sentimentTrendByDay: SentimentTrend = {}
 
     // Premium features
     if (canUsePremium && analyses.length > 0) {
@@ -352,6 +373,8 @@ export async function POST(req: NextRequest) {
 
     // Track usage
     await trackUsageEvent({
+      requestId,
+      endpoint,
       userId: user.id,
       eventType: "sentiment_analysis_performed",
       businessId,
