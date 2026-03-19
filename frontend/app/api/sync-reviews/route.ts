@@ -18,6 +18,7 @@ interface StoredReview {
   review_time: string | null
   needs_ai_reply: boolean | null
   is_actionable: boolean | null
+  ai_reply_attempts: number | null
 }
 
 interface FormattedReview {
@@ -33,6 +34,7 @@ interface FormattedReview {
 
 const ACTIONABLE_REVIEW_WINDOW_DAYS = 30
 const NEGATIVE_REVIEW_NOTIFICATION_THRESHOLD = 2
+const MAX_GENERATIONS_PER_REVIEW = 5
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
@@ -336,7 +338,7 @@ export async function POST(req: NextRequest) {
 
   const { data: existingReviews, error: existingReviewsError } = await supabase
     .from("reviews")
-    .select("review_id, author_name, rating, review_text, review_time, needs_ai_reply, is_actionable")
+    .select("review_id, author_name, rating, review_text, review_time, needs_ai_reply, is_actionable, ai_reply_attempts")
     .eq("business_id", business.id)
 
   if (existingReviewsError) {
@@ -393,11 +395,30 @@ export async function POST(req: NextRequest) {
         review.rating <= NEGATIVE_REVIEW_NOTIFICATION_THRESHOLD,
     )
 
-    const autoReplyCandidates = autoReplyEnabled
+    const allAutoReplyCandidates = autoReplyEnabled
       ? formattedReviews.filter(
-          (review) => review.needs_ai_reply && review.is_actionable && review.rating >= autoReplyMinRating,
+          (review) => {
+            if (!review.needs_ai_reply || !review.is_actionable || review.rating < autoReplyMinRating) {
+              return false
+            }
+
+            const attempts = existingByReviewId.get(review.review_id)?.ai_reply_attempts ?? 0
+            return attempts < MAX_GENERATIONS_PER_REVIEW
+          },
         )
       : []
+
+    const autoReplyCandidates = allAutoReplyCandidates
+    const autoReplySkippedDueToLimit = autoReplyEnabled
+      ? formattedReviews.filter((review) => {
+          if (!review.needs_ai_reply || !review.is_actionable || review.rating < autoReplyMinRating) {
+            return false
+          }
+
+          const attempts = existingByReviewId.get(review.review_id)?.ai_reply_attempts ?? 0
+          return attempts >= MAX_GENERATIONS_PER_REVIEW
+        }).length
+      : 0
 
     let negativeReviewNotificationAttempted = false
     let negativeReviewNotificationSent = false
@@ -568,6 +589,12 @@ export async function POST(req: NextRequest) {
           continue
         }
 
+        const currentAttempts = existingByReviewId.get(candidate.review_id)?.ai_reply_attempts ?? 0
+
+        if (currentAttempts >= MAX_GENERATIONS_PER_REVIEW) {
+          continue
+        }
+
         const effectiveTone = resolveAdaptiveReplyTone({
           baseTone: replyTone,
           sentiment: latestSentimentByReviewId.get(localReviewId)?.sentiment,
@@ -591,6 +618,28 @@ export async function POST(req: NextRequest) {
           if (!replyText) {
             throw new Error("Generated auto-reply was empty")
           }
+
+          await serviceSupabase
+            .from("reviews")
+            .update({
+              ai_reply_attempts: currentAttempts + 1,
+              last_ai_attempt_at: new Date().toISOString(),
+            })
+            .eq("id", localReviewId)
+
+          existingByReviewId.set(candidate.review_id, {
+            ...(existingByReviewId.get(candidate.review_id) ?? {
+              review_id: candidate.review_id,
+              author_name: candidate.author_name,
+              rating: candidate.rating,
+              review_text: candidate.review_text,
+              review_time: candidate.review_time,
+              needs_ai_reply: candidate.needs_ai_reply,
+              is_actionable: candidate.is_actionable,
+              ai_reply_attempts: 0,
+            }),
+            ai_reply_attempts: currentAttempts + 1,
+          })
 
           const googleReplyUrl = `https://mybusiness.googleapis.com/v4/accounts/${business.account_id}/locations/${business.location_id}/reviews/${candidate.review_id}/reply`
 
@@ -696,6 +745,8 @@ export async function POST(req: NextRequest) {
         enabled: autoReplyEnabled,
         minRating: autoReplyMinRating,
         candidateCount: autoReplyCandidates.length,
+        skippedDueToLimit: autoReplySkippedDueToLimit,
+        perReviewGenerationLimit: MAX_GENERATIONS_PER_REVIEW,
         attempted: autoReplyAttempted,
         posted: autoReplyPosted,
         failed: autoReplyFailed,

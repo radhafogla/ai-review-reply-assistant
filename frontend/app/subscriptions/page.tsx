@@ -8,6 +8,7 @@ import {
   PLAN_ORDER,
   PREMIUM_AUTO_REPLY_DEFAULT_MIN_RATING,
   getFeatureLabel,
+  getPlanLimits,
   getPlanDescription,
   getPlanLabel,
   getPlanPrice,
@@ -148,35 +149,14 @@ export default function SubscriptionsPage() {
           <div style={{ padding: "0 32px 20px" }}>
             <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, backgroundColor: "#f8fafc", padding: 14 }}>
               <p style={{ margin: 0, fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#475569" }}>
-                Current usage (soft limits)
+                AI generation limits (per-review)
               </p>
               <p style={{ margin: "8px 0 0", fontSize: 13, color: "#334155", fontWeight: 600 }}>
-                {getPlanUsageLabel("monthlyAiGenerations")}: {subscription.usage.monthlyAiGenerations} / {subscription.limits.monthlyAiGenerations}
+                Max 5 attempts per review
               </p>
-              <p style={{ margin: "4px 0 0", fontSize: 13, color: "#334155", fontWeight: 600 }}>
-                {getPlanUsageLabel("connectedBusinesses")}: {subscription.usage.connectedBusinesses} / {subscription.limits.connectedBusinesses}
+              <p style={{ margin: "8px 0 0", fontSize: 12, color: "#64748b", fontWeight: 600 }}>
+                You can generate up to 5 different variations for each review. Additional attempts are blocked until you post or delete the current reply.
               </p>
-
-              {subscription.warnings.length > 0 && (
-                <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
-                  {subscription.warnings.map((warning) => (
-                    <div
-                      key={warning.key}
-                      style={{
-                        borderRadius: 8,
-                        border: warning.severity === "warning" ? "1px solid #fca5a5" : "1px solid #fde68a",
-                        backgroundColor: warning.severity === "warning" ? "#fef2f2" : "#fffbeb",
-                        color: warning.severity === "warning" ? "#991b1b" : "#92400e",
-                        fontSize: 12,
-                        fontWeight: 700,
-                        padding: "8px 10px",
-                      }}
-                    >
-                      {warning.label}: {warning.used}/{warning.limit} ({warning.percentUsed}%)
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         </section>
@@ -185,6 +165,7 @@ export default function SubscriptionsPage() {
           {PLAN_ORDER.map((plan) => {
             const isCurrent = subscription.plan === plan
             const isUpdating = updatingPlan === plan
+            const planLimits = getPlanLimits(plan)
 
             return (
               <article
@@ -224,6 +205,15 @@ export default function SubscriptionsPage() {
                       </div>
                     )
                   })}
+                </div>
+
+                <div style={{ marginTop: 12, borderTop: "1px solid #e2e8f0", paddingTop: 10, display: "grid", gap: 4 }}>
+                  <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#334155" }}>
+                    {getPlanUsageLabel("connectedBusinesses")}: {planLimits.connectedBusinesses}
+                  </p>
+                  <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#334155" }}>
+                    Per-review AI generations: 5 max
+                  </p>
                 </div>
 
                 <button

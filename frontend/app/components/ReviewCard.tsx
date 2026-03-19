@@ -5,6 +5,8 @@ import { supabase } from "@/lib/supabaseClient"
 import { ReviewWithAnalysis } from "../types/review"
 import { REPLY_TONE_LABELS, type ReplyTone } from "@/lib/replyTone"
 
+const MAX_GENERATIONS_PER_REVIEW = 5
+
 interface Props {
   review: ReviewWithAnalysis
   mode: "needs-attention" | "posted" | "deleted"
@@ -48,7 +50,7 @@ export default function ReviewCard({
   onReplyChanged,
 }: Props) {
   const [latestTone, setLatestTone] = useState<{ base: ReplyTone; effective: ReplyTone; adapted: boolean } | null>(null)
-  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error" | "warning"; text: string } | null>(null)
   const [replyText, setReplyText] = useState(review.latest_reply?.reply_text ?? "")
   const [savedText, setSavedText] = useState(review.latest_reply?.reply_text ?? "")
   const [generating, setGenerating] = useState(false)
@@ -56,6 +58,7 @@ export default function ReviewCard({
   const [posting, setPosting] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [sessionExpiredRedirecting, setSessionExpiredRedirecting] = useState(false)
+  const [currentAttempts, setCurrentAttempts] = useState(review.ai_reply_attempts ?? 0)
 
   useEffect(() => {
     if (!actionMessage) return
@@ -114,7 +117,8 @@ export default function ReviewCard({
     const text = review.latest_reply?.reply_text ?? ""
     setReplyText(text)
     setSavedText(text)
-  }, [review.id, review.latest_reply?.reply_text])
+    setCurrentAttempts(review.ai_reply_attempts ?? 0)
+  }, [review.id, review.latest_reply?.reply_text, review.ai_reply_attempts])
 
   function showActionMessage(type: "success" | "error", text: string) {
     setActionMessage({ type, text })
@@ -160,6 +164,24 @@ export default function ReviewCard({
         }
         onReplyChanged?.(review.id, data.reply, "draft")
         showActionMessage("success", "Reply generated.")
+        
+        // Refetch the review to get the updated ai_reply_attempts from server
+        try {
+          const refreshRes = await fetch("/api/get-reviews", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ businessId: review.business_id }),
+          })
+          if (refreshRes.ok) {
+            const refreshData = await refreshRes.json()
+            const updatedReview = refreshData.reviews?.find((r: ReviewWithAnalysis) => r.id === review.id)
+            if (updatedReview) {
+              setCurrentAttempts(updatedReview.ai_reply_attempts ?? 0)
+            }
+          }
+        } catch (err) {
+          console.error("Failed to refresh review data", err)
+        }
       }
     } catch (error) {
       console.error("generate-reply request failed", error)
@@ -289,9 +311,11 @@ export default function ReviewCard({
   const isDeleted = mode === "deleted"
   const expanded = isExpanded ?? true
   const isDirty = replyText !== savedText
-  const genOff  = generating
+  const remainingAttempts = Math.max(0, MAX_GENERATIONS_PER_REVIEW - currentAttempts)
+  const genOff  = generating || remainingAttempts === 0
   const saveOff = saving || !isDirty
   const postOff = posting || !replyText.trim()
+  const attemptsReached = remainingAttempts === 0
 
   const cardBackground = isDeleted ? "#fff1f2" : isNA ? "#fffbeb" : "#f0fdf4"
   const cardBorder = isDeleted ? "#fda4af" : isNA ? "#fcd34d" : "#6ee7b7"
@@ -425,6 +449,7 @@ export default function ReviewCard({
                 <button
                   onClick={generateReply}
                   disabled={genOff}
+                  title={attemptsReached ? "All 5 attempts used. You can edit or post your reply." : undefined}
                   style={{
                     padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 700,
                     cursor: genOff ? "not-allowed" : "pointer",
@@ -433,7 +458,7 @@ export default function ReviewCard({
                     color: genOff ? BTN_OFF.text : BTN_BLUE.text,
                   }}
                 >
-                  {generating ? "Generating\u2026" : "Generate Reply"}
+                  {generating ? "Generating\u2026" : attemptsReached ? "All attempts used" : "Generate Reply"}
                 </button>
 
                 <button
@@ -485,6 +510,25 @@ export default function ReviewCard({
                   </span>
                 )}
 
+                {!isDeleted && (
+                  <span
+                    style={{
+                      marginLeft: 4,
+                      borderRadius: 999,
+                      padding: "6px 10px",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      alignSelf: "center",
+                      backgroundColor: remainingAttempts === 0 ? "#fee2e2" : remainingAttempts === 1 ? "#fef3c7" : "#dbeafe",
+                      border: remainingAttempts === 0 ? "1px solid #fca5a5" : remainingAttempts === 1 ? "1px solid #fcd34d" : "1px solid #93c5fd",
+                      color: remainingAttempts === 0 ? "#991b1b" : remainingAttempts === 1 ? "#78350f" : "#1e3a8a",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {remainingAttempts} {remainingAttempts === 1 ? "attempt" : "attempts"} left
+                  </span>
+                )}
+
                 {actionMessage && (
                   <span
                     style={{
@@ -494,9 +538,9 @@ export default function ReviewCard({
                       fontSize: 12,
                       fontWeight: 600,
                       alignSelf: "center",
-                      backgroundColor: actionMessage.type === "success" ? "#dcfce7" : "#fee2e2",
-                      border: `1px solid ${actionMessage.type === "success" ? "#86efac" : "#fca5a5"}`,
-                      color: actionMessage.type === "success" ? "#14532d" : "#991b1b",
+                      backgroundColor: actionMessage.type === "success" ? "#dcfce7" : actionMessage.type === "warning" ? "#fef3c7" : "#fee2e2",
+                      border: `1px solid ${actionMessage.type === "success" ? "#86efac" : actionMessage.type === "warning" ? "#fcd34d" : "#fca5a5"}`,
+                      color: actionMessage.type === "success" ? "#14532d" : actionMessage.type === "warning" ? "#78350f" : "#991b1b",
                     }}
                   >
                     {actionMessage.text}

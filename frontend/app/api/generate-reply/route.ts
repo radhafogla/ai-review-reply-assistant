@@ -6,6 +6,8 @@ import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger";
 import { trackUsageEvent } from "@/lib/usageTracking";
 import { getReplyTonePromptGuidance, normalizeReplyTone, resolveAdaptiveReplyTone } from "@/lib/replyTone";
 
+const MAX_GENERATIONS_PER_REVIEW = 5;
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -62,6 +64,42 @@ export async function POST(req: NextRequest) {
   logApiRequest({ requestId, endpoint, userId: user.id, reviewId });
 
   const serviceSupabase = createServiceClient();
+
+  const { data: reviewForLimit } = await supabase
+    .from("reviews")
+    .select("ai_reply_attempts")
+    .eq("id", reviewId)
+    .single();
+
+  const usedGenerationsForReview = reviewForLimit?.ai_reply_attempts ?? 0;
+
+  if (usedGenerationsForReview >= MAX_GENERATIONS_PER_REVIEW) {
+    await trackUsageEvent({
+      requestId,
+      endpoint,
+      eventType: "limit_warning_shown",
+      userId: user.id,
+      reviewId,
+      metadata: {
+        limitKey: "perReviewAiGenerations",
+        used: usedGenerationsForReview,
+        limit: MAX_GENERATIONS_PER_REVIEW,
+        percentUsed: 100,
+        severity: "warning",
+        blocked: true,
+      },
+    });
+
+    return NextResponse.json(
+      {
+        error: "Per-review AI generation limit reached",
+        reason: "per_review_generation_limit_reached",
+        used: usedGenerationsForReview,
+        limit: MAX_GENERATIONS_PER_REVIEW,
+      },
+      { status: 429 },
+    );
+  }
 
   let baseTone = normalizeReplyTone(null);
   let effectiveTone = baseTone;
@@ -182,6 +220,14 @@ Write a professional and friendly reply under 80 words. You dont need to address
       metadata: { rating, source: "ai", mode: "update_existing_draft", tone: effectiveTone },
     })
 
+    await serviceSupabase
+      .from("reviews")
+      .update({
+        ai_reply_attempts: usedGenerationsForReview + 1,
+        last_ai_attempt_at: new Date().toISOString(),
+      })
+      .eq("id", reviewId)
+
     return NextResponse.json({
       reply,
       tone: {
@@ -246,6 +292,14 @@ Write a professional and friendly reply under 80 words. You dont need to address
     reviewId,
     metadata: { rating, source: "ai", mode: "create_draft", tone: effectiveTone },
   })
+
+  await serviceSupabase
+    .from("reviews")
+    .update({
+      ai_reply_attempts: usedGenerationsForReview + 1,
+      last_ai_attempt_at: new Date().toISOString(),
+    })
+    .eq("id", reviewId)
 
   return NextResponse.json({
     reply,

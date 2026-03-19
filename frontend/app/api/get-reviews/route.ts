@@ -125,6 +125,7 @@ export async function POST(req: NextRequest) {
     review_time,
     needs_ai_reply,
     is_actionable,
+    ai_reply_attempts,
     latest_reply:review_replies!reviews_latest_reply_id_fkey (
       id,
       reply_text,

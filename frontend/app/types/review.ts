@@ -11,6 +11,7 @@ export interface Review {
     is_actionable?: boolean;
     latest_reply_id?: string;
     latest_reply?: ReviewReply
+    ai_reply_attempts?: number
 }
 
 export interface ReviewReply {
