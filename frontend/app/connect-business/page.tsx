@@ -235,7 +235,7 @@ function ConnectBusinessContent() {
   if (checkingSession) {
     return (
       <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc" }}>
-        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "32px 24px 40px" }}>
+        <div style={{ maxWidth: 1680, margin: "0 auto", padding: "20px 24px 36px" }}>
           <section style={{ borderRadius: 20, border: "1px solid #e2e8f0", backgroundColor: "#fff", padding: 24 }}>
             <p style={{ margin: 0, color: "#64748b", fontSize: 14 }}>Loading session...</p>
           </section>
@@ -248,17 +248,17 @@ function ConnectBusinessContent() {
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc" }}>
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "32px 24px 40px" }}>
+      <div style={{ maxWidth: 1680, margin: "0 auto", padding: "20px 24px 36px" }}>
         <section style={{
-          marginBottom: 20,
+          marginBottom: 12,
           borderRadius: 20,
           overflow: "hidden",
           border: "1px solid #e2e8f0",
           backgroundColor: "#fff",
           boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
         }}>
-          <div style={{ backgroundColor: "#0f172a", padding: "24px 32px" }}>
-            <p style={{ margin: 0, fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", fontWeight: 700, color: "#93c5fd" }}>
+          <div style={{ backgroundColor: "#0f172a", padding: "20px 28px" }}>
+            <p style={{ margin: 0, fontSize: 14, letterSpacing: "0.16em", textTransform: "uppercase", fontWeight: 700, color: "#93c5fd" }}>
               Business management
             </p>
             <h1 style={{ margin: "8px 0 0", fontSize: 30, fontWeight: 800, color: "#fff", letterSpacing: "-0.4px" }}>
@@ -269,10 +269,10 @@ function ConnectBusinessContent() {
             </p>
           </div>
 
-          <div style={{ padding: "20px 32px" }}>
+          <div style={{ padding: "18px 24px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <div>
-                <p style={{ margin: 0, fontSize: 12, color: "#64748b", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                <p style={{ margin: 0, fontSize: 14, color: "#64748b", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>
                   Connected businesses
                 </p>
                 <p style={{ margin: "6px 0 0", fontSize: 20, color: "#0f172a", fontWeight: 800 }}>

@@ -27,8 +27,8 @@ export default function ReviewList({
   const [localReviews, setLocalReviews] = useState<ReviewWithAnalysis[]>(reviews)
   const [isNeedsAttentionOpen, setIsNeedsAttentionOpen] = useState(true)
   const [isBacklogOpen, setIsBacklogOpen] = useState(false)
-  const [isDeletedOpen, setIsDeletedOpen] = useState(true)
-  const [isPostedOpen, setIsPostedOpen] = useState(true)
+  const [isDeletedOpen, setIsDeletedOpen] = useState(false)
+  const [isPostedOpen, setIsPostedOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [bulkGenerating, setBulkGenerating] = useState(false)
@@ -626,6 +626,9 @@ export default function ReviewList({
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: "#0f172a", margin: 0 }}>Reviews</h2>
         </div>
+        <p style={{ margin: "8px 0 0", fontSize: 12, color: "#64748b", fontWeight: 600 }}>
+          Generate AI replies, then edit and save/post when ready. You can also post directly when the draft looks good.
+        </p>
       </div>
 
       {/* ── sections ────────────────────────────────────────────────────── */}

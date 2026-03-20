@@ -494,20 +494,6 @@ export default function AnalyticsPage() {
     ? `Fix ${primaryTheme[0]} concerns (mentioned in ${Math.round((primaryTheme[1].count / Math.max(analyzedReviewCount, 1)) * 100)}% of analyzed reviews)`
     : (focusAreas[0] ?? "No primary focus detected yet")
 
-  const recent14Trend = sortedTrendData.slice(-14)
-  const getNegativeShare = (points: SentimentTrendPoint[]) => {
-    const totals = points.reduce(
-      (acc, point) => {
-        acc.negative += point.negative
-        acc.total += point.positive + point.neutral + point.negative
-        return acc
-      },
-      { negative: 0, total: 0 },
-    )
-    return totals.total > 0 ? (totals.negative / totals.total) * 100 : 0
-  }
-  const recentNegativeShare = getNegativeShare(recent14Trend)
-
   const getThemeSentimentContext = (theme: string): ThemeSentimentContext => {
     const normalizedTheme = theme.toLowerCase()
     const isNegativeTheme = normalizedFocusAreas.some((focus) => focus.includes(normalizedTheme) || normalizedTheme.includes(focus))
@@ -556,17 +542,17 @@ export default function AnalyticsPage() {
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc" }}>
-      <div style={{ maxWidth: 1680, margin: "0 auto", padding: "32px 24px 40px" }}>
+      <div style={{ maxWidth: 1680, margin: "0 auto", padding: "20px 24px 36px" }}>
         <section style={{
-          marginBottom: 24,
+          marginBottom: 12,
           borderRadius: 20,
           overflow: "hidden",
           border: "1px solid #e2e8f0",
           backgroundColor: "#ffffff",
           boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
         }}>
-          <div style={{ backgroundColor: "#0f172a", padding: "24px 32px" }}>
-            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "#fdba74", margin: 0 }}>
+          <div style={{ backgroundColor: "#0f172a", padding: "20px 28px" }}>
+            <p style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "#fdba74", margin: 0 }}>
               Basic subscription analytics
             </p>
             <h1 style={{ fontSize: 30, fontWeight: 800, color: "#ffffff", margin: "8px 0 0", letterSpacing: "-0.4px" }}>
@@ -577,7 +563,7 @@ export default function AnalyticsPage() {
             </p>
           </div>
 
-          <div style={{ padding: "24px 32px" }}>
+          <div style={{ padding: "18px 24px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <label htmlFor="analytics-business-filter" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#64748b" }}>
@@ -656,21 +642,21 @@ export default function AnalyticsPage() {
             </div>
 
             <div style={{ marginTop: 16, display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
-              <div style={{ borderRadius: 12, backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", padding: "12px 14px" }}>
-                <div style={{ fontSize: 11, color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>Reviews</div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: "#0f172a", marginTop: 4 }}>{totals?.reviews ?? 0}</div>
+              <div style={{ borderRadius: 14, backgroundColor: "#f8fafc", border: "1.5px solid #e2e8f0", padding: "14px 18px" }}>
+                <div style={{ fontSize: 14, color: "#64748b", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Reviews</div>
+                <div style={{ fontSize: 26, fontWeight: 800, color: "#0f172a", marginTop: 8 }}>{totals?.reviews ?? 0}</div>
               </div>
-              <div style={{ borderRadius: 12, backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", padding: "12px 14px" }}>
-                <div style={{ fontSize: 11, color: "#065f46", fontWeight: 700, textTransform: "uppercase" }}>Replies</div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: "#14532d", marginTop: 4 }}>{totals?.replies ?? 0}</div>
+              <div style={{ borderRadius: 14, backgroundColor: "#f0fdf4", border: "1.5px solid #bbf7d0", padding: "14px 18px" }}>
+                <div style={{ fontSize: 14, color: "#065f46", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Replies</div>
+                <div style={{ fontSize: 26, fontWeight: 800, color: "#14532d", marginTop: 8 }}>{totals?.replies ?? 0}</div>
               </div>
-              <div style={{ borderRadius: 12, backgroundColor: "#eff6ff", border: "1px solid #bfdbfe", padding: "12px 14px" }}>
-                <div style={{ fontSize: 11, color: "#1d4ed8", fontWeight: 700, textTransform: "uppercase" }}>Analysis rows</div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: "#1e3a8a", marginTop: 4 }}>{totals?.analyses ?? 0}</div>
+              <div style={{ borderRadius: 14, backgroundColor: "#eff6ff", border: "1.5px solid #bfdbfe", padding: "14px 18px" }}>
+                <div style={{ fontSize: 14, color: "#1d4ed8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Analysis rows</div>
+                <div style={{ fontSize: 26, fontWeight: 800, color: "#1e3a8a", marginTop: 8 }}>{totals?.analyses ?? 0}</div>
               </div>
-              <div style={{ borderRadius: 12, backgroundColor: "#fefce8", border: "1px solid #fde68a", padding: "12px 14px" }}>
-                <div style={{ fontSize: 11, color: "#854d0e", fontWeight: 700, textTransform: "uppercase" }}>Integrations</div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: "#78350f", marginTop: 4 }}>{totals?.integrations ?? 0}</div>
+              <div style={{ borderRadius: 14, backgroundColor: "#fefce8", border: "1.5px solid #fde68a", padding: "14px 18px" }}>
+                <div style={{ fontSize: 14, color: "#854d0e", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Integrations</div>
+                <div style={{ fontSize: 26, fontWeight: 800, color: "#78350f", marginTop: 8 }}>{totals?.integrations ?? 0}</div>
               </div>
             </div>
 

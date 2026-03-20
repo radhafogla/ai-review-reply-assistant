@@ -118,6 +118,37 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  const { data: allRatings, error: allRatingsError } = await supabase
+    .from("reviews")
+    .select("rating")
+    .eq("business_id", selectedBusinessId);
+
+  if (allRatingsError) {
+    logApiError({
+      requestId,
+      endpoint,
+      userId,
+      status: 500,
+      message: "Failed fetching all-review ratings",
+      error: allRatingsError,
+      selectedBusinessId,
+    });
+  }
+
+  const numericRatings = (allRatings ?? [])
+    .map((row) => Number(row.rating))
+    .filter((value) => Number.isFinite(value));
+
+  const allReviewsAverageRating =
+    numericRatings.length > 0
+      ? Number(
+          (
+            numericRatings.reduce((sum, value) => sum + value, 0) /
+            numericRatings.length
+          ).toFixed(1),
+        )
+      : null;
+
   let reviewsQuery = supabase
     .from("reviews")
     .select(`
@@ -166,6 +197,8 @@ export async function POST(req: NextRequest) {
     message: "Fetched reviews",
     selectedBusinessId,
     reviewCount: reviews?.length ?? 0,
+    allReviewsCount: numericRatings.length,
+    allReviewsAverageRating,
     historicalBacklogCount: historicalBacklogCount ?? 0,
     includeHistoricalBacklog,
   });
@@ -175,6 +208,7 @@ export async function POST(req: NextRequest) {
     businesses,
     selectedBusinessId,
     selectedBusinessRole,
+    allReviewsAverageRating,
     historicalBacklogCount: historicalBacklogCount ?? 0,
     includeHistoricalBacklog,
   });

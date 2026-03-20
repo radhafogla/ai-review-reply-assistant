@@ -20,6 +20,7 @@ export default function Dashboard() {
   const [businesses, setBusinesses] = useState<Array<{ id: string; name: string | null }>>([])
   const [selectedBusinessRole, setSelectedBusinessRole] = useState<BusinessMemberRole | null>(null)
   const [selectedBusinessId, setSelectedBusinessId] = useState<string>("")
+  const [allReviewsAverageRating, setAllReviewsAverageRating] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [historicalBacklogCount, setHistoricalBacklogCount] = useState(0)
   const [historicalBacklogLoaded, setHistoricalBacklogLoaded] = useState(false)
@@ -34,6 +35,7 @@ export default function Dashboard() {
     }).length
 
   const backlogReviews = historicalBacklogCount
+  const totalReviews = reviews.length + backlogReviews
 
   const postedReviews =
     reviews.filter((review) => review.latest_reply?.status === "posted").length
@@ -45,12 +47,14 @@ export default function Dashboard() {
     reviews.filter((review) => review.is_actionable || Boolean(review.latest_reply)).length
 
   const averageRating =
-    reviews.length > 0
-      ? (
-          reviews.reduce((sum, review) => sum + Number(review.rating), 0) /
-          reviews.length
-        ).toFixed(1)
-      : "—"
+    allReviewsAverageRating !== null
+      ? allReviewsAverageRating.toFixed(1)
+      : reviews.length > 0
+        ? (
+            reviews.reduce((sum, review) => sum + Number(review.rating), 0) /
+            reviews.length
+          ).toFixed(1)
+        : "—"
 
   const replyCoverage =
     activeReviewBase > 0
@@ -108,6 +112,7 @@ export default function Dashboard() {
 
     if (!Array.isArray(data?.reviews)) {
       setHasBusiness(false)
+      setAllReviewsAverageRating(null)
       setLoading(false)
       return
     }
@@ -122,6 +127,7 @@ export default function Dashboard() {
       setBusinesses([])
       setSelectedBusinessRole(null)
       setReviews([])
+      setAllReviewsAverageRating(null)
       setHistoricalBacklogCount(0)
       setHistoricalBacklogLoaded(false)
       setLoading(false)
@@ -131,6 +137,11 @@ export default function Dashboard() {
     setHasBusiness(true)
     setBusinesses(nextBusinesses)
     setSelectedBusinessRole(roleFromResponse)
+    setAllReviewsAverageRating(
+      typeof data?.allReviewsAverageRating === "number" && Number.isFinite(data.allReviewsAverageRating)
+        ? data.allReviewsAverageRating
+        : null,
+    )
     setHistoricalBacklogCount(Number(data?.historicalBacklogCount ?? 0))
     if (!includeHistoricalBacklog) {
       setHistoricalBacklogLoaded(false)
@@ -181,35 +192,35 @@ export default function Dashboard() {
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc" }}>
-      <div style={{ maxWidth: 1680, margin: "0 auto", padding: "32px 24px 40px" }}>
+      <div style={{ maxWidth: 1680, margin: "0 auto", padding: "20px 24px 36px" }}>
         {/* ── HEADER CARD ─────────────────────────────────────────────────── */}
         <section style={{
-          marginBottom: 24, borderRadius: 20, overflow: "hidden",
+          marginBottom: 12, borderRadius: 20, overflow: "hidden",
           border: "1px solid #e2e8f0", backgroundColor: "#ffffff",
           boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
         }}>
 
           {/* dark banner */}
-          <div style={{ backgroundColor: "#0f172a", padding: "24px 32px" }}>
+          <div style={{ backgroundColor: "#0f172a", padding: "20px 28px" }}>
             <p style={{
-              fontSize: 11, fontWeight: 700, letterSpacing: "0.16em",
+              fontSize: 14, fontWeight: 700, letterSpacing: "0.16em",
               textTransform: "uppercase", color: "#fcd34d", margin: 0,
             }}>
               Review command center
             </p>
-            <h1 style={{ fontSize: 32, fontWeight: 800, color: "#ffffff", margin: "8px 0 0", letterSpacing: "-0.5px" }}>
+            <h1 style={{ fontSize: 30, fontWeight: 800, color: "#ffffff", margin: "6px 0 0", letterSpacing: "-0.5px" }}>
               Customer reply desk
             </h1>
-            <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 6, maxWidth: 560 }}>
+            <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 5, maxWidth: 560 }}>
               Two-lane workflow — act on reviews that need attention, track what&#39;s already posted.
             </p>
           </div>
 
           {/* stats row */}
-          <div style={{ padding: "24px 32px" }}>
+          <div style={{ padding: "18px 24px" }}>
 
             {/* business selector + avg rating */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <label htmlFor="business-filter" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#64748b" }}>
                   Business scope
@@ -241,6 +252,27 @@ export default function Dashboard() {
                     Loading...
                   </span>
                 )}
+
+                {subscription.warnings.length > 0 && (
+                  <span
+                    style={{
+                      borderRadius: 999,
+                      border: "1px solid #fde68a",
+                      backgroundColor: "#fffbeb",
+                      padding: "6px 10px",
+                      color: "#92400e",
+                      fontSize: 14,
+                      fontWeight: 700,
+                      maxWidth: 520,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                    title={subscription.warnings.map((warning) => `${warning.label} ${warning.used}/${warning.limit} (${warning.percentUsed}%)`).join(" • ")}
+                  >
+                    Usage: {subscription.warnings.map((warning) => `${warning.label} ${warning.used}/${warning.limit} (${warning.percentUsed}%)`).join(" • ")}
+                  </span>
+                )}
               </div>
 
               <div style={{
@@ -250,48 +282,48 @@ export default function Dashboard() {
               }}>
                 <span style={{ fontSize: 18, color: "#f59e0b" }}>★</span>
                 <span style={{ fontSize: 14, fontWeight: 700, color: "#78350f" }}>
-                  {averageRating} avg rating
+                  {averageRating} Avg Rating
                 </span>
               </div>
             </div>
 
             {/* stat cards */}
-            <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
+            <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
 
               {/* Total */}
               <div style={{
                 borderRadius: 14, border: "1.5px solid #e2e8f0",
-                backgroundColor: "#f8fafc", padding: "16px 20px",
+                backgroundColor: "#f8fafc", padding: "14px 18px",
               }}>
-                <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#64748b", margin: 0 }}>
+                <p style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#64748b", margin: 0 }}>
                   Total reviews
                 </p>
-                <p style={{ fontSize: 28, fontWeight: 800, color: "#0f172a", margin: "8px 0 0" }}>
-                  {reviews.length}
+                <p style={{ fontSize: 26, fontWeight: 800, color: "#0f172a", margin: "8px 0 0" }}>
+                  {totalReviews}
                 </p>
               </div>
 
               {/* Needs attention */}
               <div style={{
                 borderRadius: 14, border: "1.5px solid #fcd34d",
-                backgroundColor: "#fffbeb", padding: "16px 20px",
+                backgroundColor: "#fffbeb", padding: "14px 18px",
               }}>
-                <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#b45309", margin: 0 }}>
+                <p style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#b45309", margin: 0 }}>
                   Needs attention
                 </p>
-                <p style={{ fontSize: 28, fontWeight: 800, color: "#78350f", margin: "8px 0 0" }}>
+                <p style={{ fontSize: 26, fontWeight: 800, color: "#78350f", margin: "8px 0 0" }}>
                   {reviewsNeedingAttention}
                 </p>
               </div>
 
               <div style={{
                 borderRadius: 14, border: "1.5px solid #c4b5fd",
-                backgroundColor: "#f5f3ff", padding: "16px 20px",
+                backgroundColor: "#f5f3ff", padding: "14px 18px",
               }}>
-                <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#6d28d9", margin: 0 }}>
+                <p style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#6d28d9", margin: 0 }}>
                   Historical backlog
                 </p>
-                <p style={{ fontSize: 28, fontWeight: 800, color: "#5b21b6", margin: "8px 0 0" }}>
+                <p style={{ fontSize: 26, fontWeight: 800, color: "#5b21b6", margin: "8px 0 0" }}>
                   {backlogReviews}
                 </p>
               </div>
@@ -299,12 +331,12 @@ export default function Dashboard() {
               {/* Posted */}
               <div style={{
                 borderRadius: 14, border: "1.5px solid #6ee7b7",
-                backgroundColor: "#f0fdf4", padding: "16px 20px",
+                backgroundColor: "#f0fdf4", padding: "14px 18px",
               }}>
-                <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#065f46", margin: 0 }}>
+                <p style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#065f46", margin: 0 }}>
                   Posted replies
                 </p>
-                <p style={{ fontSize: 28, fontWeight: 800, color: "#14532d", margin: "8px 0 0" }}>
+                <p style={{ fontSize: 26, fontWeight: 800, color: "#14532d", margin: "8px 0 0" }}>
                   {postedReviews}
                 </p>
               </div>
@@ -312,9 +344,9 @@ export default function Dashboard() {
               {/* Reply coverage */}
               <div style={{
                 borderRadius: 14, border: "1.5px solid #93c5fd",
-                backgroundColor: "#eff6ff", padding: "16px 20px",
+                backgroundColor: "#eff6ff", padding: "14px 18px",
               }}>
-                <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#1d4ed8", margin: 0 }}>
+                <p style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#1d4ed8", margin: 0 }}>
                   Reply coverage
                 </p>
                 <p style={{ fontSize: 28, fontWeight: 800, color: "#1e3a8a", margin: "8px 0 0" }}>
@@ -365,23 +397,6 @@ export default function Dashboard() {
             fontWeight: 600,
           }}>
             Your current plan limits bulk actions. Upgrade in Subscriptions to unlock bulk generate and bulk post.
-          </div>
-        )}
-
-        {subscription.warnings.length > 0 && (
-          <div
-            style={{
-              marginTop: 16,
-              borderRadius: 12,
-              border: "1px solid #fde68a",
-              backgroundColor: "#fffbeb",
-              padding: "12px 14px",
-              color: "#92400e",
-              fontSize: 13,
-              fontWeight: 700,
-            }}
-          >
-            Usage notice: {subscription.warnings.map((warning) => `${warning.label} ${warning.used}/${warning.limit} (${warning.percentUsed}%)`).join(" • ")}
           </div>
         )}
 

@@ -38,6 +38,20 @@ const BTN_SLATE  = { bg: "#f8fafc", border: "#94a3b8", text: "#1e293b" }
 const BTN_GREEN  = { bg: "#059669", border: "#047857", text: "#ffffff" }
 const BTN_OFF    = { bg: "#e2e8f0", border: "#cbd5e1", text: "#94a3b8" }
 
+function formatReviewDate(value?: string) {
+  if (!value) return ""
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ""
+  return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+}
+
+function trimReviewPreview(text?: string, maxLength = 130) {
+  const normalized = String(text ?? "").trim()
+  if (!normalized) return "No written review"
+  if (normalized.length <= maxLength) return normalized
+  return `${normalized.slice(0, maxLength).trimEnd()}...`
+}
+
 export default function ReviewCard({
   review,
   mode,
@@ -367,17 +381,39 @@ export default function ReviewCard({
           {initials(review.author_name)}
         </div>
 
-        {/* name + stars — clicking expands/collapses */}
+        {/* name/rating + review preview — clicking expands/collapses */}
         <div
           onClick={() => onToggleExpand?.(review.id)}
-          style={{ flex: 1, cursor: "pointer" }}
+          style={{ flex: 1, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, minWidth: 0 }}
         >
-          <p style={{ fontWeight: 600, color: "#0f172a", margin: 0 }}>{review.author_name}</p>
-          <p style={{ fontSize: 12, color: "#94a3b8", margin: "1px 0 0" }}>Customer review</p>
-          <p style={{ fontSize: 12, margin: "2px 0 0", color: "#f59e0b" }}>
-            {"★".repeat(Math.min(5, Number(review.rating) || 0))}
-            {"☆".repeat(Math.max(0, 5 - (Number(review.rating) || 0)))}
-          </p>
+          <div style={{ minWidth: 0, flexShrink: 0 }}>
+            <p style={{ fontWeight: 600, color: "#0f172a", margin: 0 }}>{review.author_name}</p>
+            <p style={{ fontSize: 12, color: "#94a3b8", margin: "1px 0 0" }}>Customer review</p>
+            <p style={{ fontSize: 12, margin: "2px 0 0", color: "#f59e0b" }}>
+              {"★".repeat(Math.min(5, Number(review.rating) || 0))}
+              {"☆".repeat(Math.max(0, 5 - (Number(review.rating) || 0)))}
+            </p>
+          </div>
+
+          <div style={{ minWidth: 0, flex: 1, borderLeft: "1px solid #cbd5e1", paddingLeft: 12 }}>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#334155",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+              title={trimReviewPreview(review.review_text, 400)}
+            >
+              &ldquo;{trimReviewPreview(review.review_text, 160)}&rdquo;
+            </p>
+            <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b", fontWeight: 600 }}>
+              {formatReviewDate(review.review_time || review.created_at)}
+            </p>
+          </div>
         </div>
 
         {/* status badge + chevron */}
@@ -404,29 +440,8 @@ export default function ReviewCard({
       {expanded && (
         <div style={{ padding: "0 16px 16px", borderTop: `1px solid ${dividerBorder}` }}>
 
-          {/* review text */}
-          <p style={{
-            marginTop: 12, backgroundColor: "#f8fafc", borderRadius: 10,
-            padding: "10px 14px", fontSize: 13, lineHeight: 1.7, color: "#475569",
-          }}>
-            &ldquo;{review.review_text}&rdquo;
-          </p>
-
           {isNA || isDeleted ? (
             <>
-              {/* action note */}
-              <div style={{
-                marginTop: 10, borderRadius: 8, padding: "8px 12px",
-                fontSize: 12, fontWeight: 600,
-                backgroundColor: isDeleted ? "#ffe4e6" : "#fef9c3",
-                border: `1px solid ${isDeleted ? "#fecdd3" : "#fde047"}`,
-                color: isDeleted ? "#9f1239" : "#713f12",
-              }}>
-                {isDeleted
-                  ? "This reply was removed from Google. Review it and post again when ready."
-                  : "Edit the reply below, then click Save and Post."}
-              </div>
-
               {/* textarea */}
               <textarea
                 rows={4}

@@ -108,8 +108,8 @@ export default function SubscriptionsPage() {
   }
 
   return (
-    <main style={{ minHeight: "100vh", backgroundColor: "#f8fafc", padding: "32px 24px 40px" }}>
-      <div style={{ maxWidth: 1280, margin: "0 auto" }}>
+    <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc" }}>
+      <div style={{ maxWidth: 1680, margin: "0 auto", padding: "20px 24px 36px" }}>
         <section
           style={{
             borderRadius: 20,
@@ -117,11 +117,11 @@ export default function SubscriptionsPage() {
             border: "1px solid #e2e8f0",
             backgroundColor: "#ffffff",
             boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
-            marginBottom: 20,
+            marginBottom: 12,
           }}
         >
-          <div style={{ backgroundColor: "#0f172a", padding: "24px 32px" }}>
-            <p style={{ margin: 0, fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", fontWeight: 700, color: "#93c5fd" }}>
+          <div style={{ backgroundColor: "#0f172a", padding: "20px 28px" }}>
+            <p style={{ margin: 0, fontSize: 14, letterSpacing: "0.16em", textTransform: "uppercase", fontWeight: 700, color: "#93c5fd" }}>
               Plans and access controls
             </p>
             <h1 style={{ margin: "8px 0 0", fontSize: 30, fontWeight: 800, color: "#fff", letterSpacing: "-0.4px" }}>
@@ -132,7 +132,7 @@ export default function SubscriptionsPage() {
             </p>
           </div>
 
-          <div style={{ padding: "18px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ padding: "18px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: "#334155" }}>
               Current plan: {loading ? "Loading..." : getPlanLabel(subscription.plan)}
             </span>
@@ -146,7 +146,7 @@ export default function SubscriptionsPage() {
             {error && <span style={{ fontSize: 13, color: "#b91c1c", fontWeight: 700 }}>{error}</span>}
           </div>
 
-          <div style={{ padding: "0 32px 20px" }}>
+          <div style={{ padding: "0 24px 20px" }}>
             <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, backgroundColor: "#f8fafc", padding: 14 }}>
               <p style={{ margin: 0, fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#475569" }}>
                 Plan split
@@ -288,6 +288,6 @@ export default function SubscriptionsPage() {
           </section>
         )}
       </div>
-    </main>
+    </div>
   )
 }
