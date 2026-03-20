@@ -221,7 +221,7 @@ export async function POST(req: NextRequest) {
     .select("event_type")
     .eq("user_id", user.id)
     .eq("business_id", selectedBusinessId)
-    .in("event_type", ["auto_reply_attempted", "auto_reply_posted", "auto_reply_failed"])
+    .in("event_type", ["auto_reply_attempted", "auto_reply_posted", "auto_reply_failed", "negative_review_notification_sent", "negative_review_notification_failed"])
 
   if (autoReplyEventsError) {
     logApiError({ requestId, endpoint, userId: user.id, status: 500, message: "Failed to load auto-reply usage events", error: autoReplyEventsError.message })
@@ -231,11 +231,15 @@ export async function POST(req: NextRequest) {
   let autoReplyAttempted = 0
   let autoReplyPosted = 0
   let autoReplyFailed = 0
+  let negativeAlertsSent = 0
+  let negativeAlertsFailed = 0
 
   for (const event of autoReplyEvents ?? []) {
     if (event.event_type === "auto_reply_attempted") autoReplyAttempted += 1
     else if (event.event_type === "auto_reply_posted") autoReplyPosted += 1
     else if (event.event_type === "auto_reply_failed") autoReplyFailed += 1
+    else if (event.event_type === "negative_review_notification_sent") negativeAlertsSent += 1
+    else if (event.event_type === "negative_review_notification_failed") negativeAlertsFailed += 1
   }
 
   const autoReplySuccessRate = autoReplyAttempted > 0
@@ -305,6 +309,8 @@ export async function POST(req: NextRequest) {
       totalReviewsAllTime: totalReviewsAllTime ?? reviews?.length ?? 0,
       replies: totalRepliesAllTime ?? replies?.length ?? 0,
       avgRating,
+      negativeAlertsSent,
+      negativeAlertsFailed,
       businesses: businesses.length,
       plan: subscriptions?.[0]?.plan ?? resolvedPlan,
       subscriptionStatus: subscriptions?.[0]?.status ?? "active",

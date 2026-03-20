@@ -163,6 +163,7 @@ Review: "${review_text}"
 ${toneInstruction}
 
 Write a professional and friendly reply under 80 words. You dont need to address/greet the user or add regards at the end. Just the message itself is good.
+Make it sound human and conversational, not robotic or overly formal. Use natural everyday wording, avoid generic corporate phrases, and acknowledge one concrete detail from the review when possible.
 `;
 
   const completion = await openai.chat.completions.create({

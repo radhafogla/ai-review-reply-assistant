@@ -15,6 +15,8 @@ type AnalyticsPayload = {
     totalReviewsAllTime: number
     replies: number
     avgRating: number
+    negativeAlertsSent: number
+    negativeAlertsFailed: number
     businesses: number
     plan: string
     subscriptionStatus: string
@@ -224,7 +226,7 @@ function StackedSentimentTrend({ title, data }: { title: string; data: Sentiment
     <div style={{ borderRadius: 16, border: "1px solid #e2e8f0", backgroundColor: "#ffffff", padding: 18 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "#0f172a" }}>{title}</h3>
+          <h3 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#0f172a" }}>{title}</h3>
           <p style={{ margin: "4px 0 0", fontSize: 14, color: "#475569" }}>Daily sentiment mix across the most recent 30 days.</p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -662,6 +664,14 @@ export default function AnalyticsPage() {
                 <div style={{ fontSize: 14, color: "#7e22ce", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Avg. rating</div>
                 <div style={{ fontSize: 26, fontWeight: 800, color: "#581c87", marginTop: 8 }}>{totals?.avgRating != null ? `${totals.avgRating} ★` : "—"}</div>
               </div>
+              <div style={{ borderRadius: 14, backgroundColor: "#fff7ed", border: "1.5px solid #fdba74", padding: "14px 18px" }}>
+                <div style={{ fontSize: 14, color: "#9a3412", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Negative alerts sent</div>
+                <div style={{ fontSize: 26, fontWeight: 800, color: "#7c2d12", marginTop: 8 }}>{totals?.negativeAlertsSent ?? 0}</div>
+              </div>
+              <div style={{ borderRadius: 14, backgroundColor: "#fef2f2", border: "1.5px solid #fecaca", padding: "14px 18px" }}>
+                <div style={{ fontSize: 14, color: "#b91c1c", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Negative alerts failed</div>
+                <div style={{ fontSize: 26, fontWeight: 800, color: "#991b1b", marginTop: 8 }}>{totals?.negativeAlertsFailed ?? 0}</div>
+              </div>
             </div>
 
             {isPremiumPlan && (
@@ -832,7 +842,7 @@ export default function AnalyticsPage() {
               <h2 style={{ fontSize: 30, fontWeight: 800, color: "#ffffff", margin: "8px 0 0", letterSpacing: "-0.4px" }}>
                 Premium Insight Layer
               </h2>
-              <p style={{ fontSize: 15, color: "#64748b", marginTop: 6, maxWidth: 700 }}>
+              <p style={{ fontSize: 16, color: "#64748b", marginTop: 6, maxWidth: 1000 }}>
                 Recurring themes, AI recommended actions, and sentiment movement context beyond the standard sentiment split.
               </p>
             </div>
@@ -856,13 +866,13 @@ export default function AnalyticsPage() {
                 />
               </div>
 
-              <div style={{ display: "grid", gap: 16, gridTemplateColumns: "minmax(0, 1.1fr) minmax(0, 0.9fr)" }}>
+              <div style={{ display: "grid", gap: 16, gridTemplateColumns: "minmax(0, 0.8fr) minmax(0, 1.2fr)" }}>
                 <div style={{ display: "grid", gap: 16 }}>
                   {topThemes.length > 0 && (
                     <div style={{ borderRadius: 16, border: "1px solid #e2e8f0", backgroundColor: "#ffffff", padding: 18 }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                         <div>
-                          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "#0f172a" }}>Recurring themes</h3>
+                          <h3 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#0f172a" }}>Recurring themes</h3>
                           <p style={{ margin: "4px 0 0", fontSize: 14, color: "#475569" }}>Most-mentioned topics found in the latest analysis snapshot.</p>
                         </div>
                       </div>
@@ -873,7 +883,7 @@ export default function AnalyticsPage() {
                             <div key={theme} style={{ display: "grid", gap: 6 }}>
                               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                                 <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                                  <span style={{ fontSize: 15, color: "#0f172a", fontWeight: 700, textTransform: "capitalize" }}>{theme}</span>
+                                  <span style={{ fontSize: 16, color: "#0f172a", fontWeight: 700, textTransform: "capitalize" }}>{theme}</span>
                                   <span style={{ fontSize: 14, fontWeight: 700, color: context.toneColor }}>{context.emoji} {context.label}</span>
                                 </span>
                                 <span style={{ fontSize: 14, color: "#6366f1", fontWeight: 800, whiteSpace: "nowrap" }}>{data.count} mentions</span>
@@ -900,7 +910,7 @@ export default function AnalyticsPage() {
 
                 <div style={{ display: "grid", gap: 16 }}>
                   <div style={{ borderRadius: 16, border: "1px solid #e2e8f0", backgroundColor: "#ffffff", padding: 18 }}>
-                    <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "#0f172a" }}>AI Recommended actions</h3>
+                    <h3 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#0f172a" }}>AI Recommended actions</h3>
                     <p style={{ margin: "6px 0 0", fontSize: 14, color: "#475569" }}>Use these cues to decide where to respond, retrain staff, or adjust operations.</p>
                     {sentimentCache.suggestions?.basis && (
                       <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>Based on {sentimentCache.suggestions.basis}</p>

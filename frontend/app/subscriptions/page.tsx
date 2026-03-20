@@ -152,7 +152,10 @@ export default function SubscriptionsPage() {
                 Plan split
               </p>
               <p style={{ margin: "8px 0 0", fontSize: 13, color: "#334155", fontWeight: 600 }}>
-                Basic includes manual sentiment analysis. Premium adds themes, AI suggestions, and deeper trend views.
+                Basic subscription includes manual sentiment analysis. Premium adds themes, AI suggestions, and deeper trend views.
+              </p>
+              <p style={{ margin: "8px 0 0", fontSize: 12, color: "#334155", fontWeight: 600 }}>
+                Negative review email alerts are available across Free, Basic, and Premium.
               </p>
               <p style={{ margin: "8px 0 0", fontSize: 12, color: "#64748b", fontWeight: 600 }}>
                 AI reply generation stays capped at 5 attempts per review across all plans.

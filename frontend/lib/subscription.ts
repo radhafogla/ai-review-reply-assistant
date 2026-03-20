@@ -2,6 +2,7 @@ export type SubscriptionPlan = "free" | "basic" | "premium"
 
 export type SubscriptionFeature =
   | "analytics"
+  | "negativeReviewAlerts"
   | "advancedAnalytics"
   | "aiGeneration"
   | "bulkActions"
@@ -41,6 +42,7 @@ export const PLAN_PRICING: Record<SubscriptionPlan, string> = {
 
 export const PLAN_FEATURE_ORDER: SubscriptionFeature[] = [
   "analytics",
+  "negativeReviewAlerts",
   "advancedAnalytics",
   "aiGeneration",
   "bulkActions",
@@ -50,6 +52,7 @@ export const PLAN_FEATURE_ORDER: SubscriptionFeature[] = [
 
 export const PLAN_FEATURE_LABELS: Record<SubscriptionFeature, string> = {
   analytics: "Basic analytics",
+  negativeReviewAlerts: "Negative review email alerts",
   advancedAnalytics: "Premium insights",
   aiGeneration: "AI reply generation",
   bulkActions: "Bulk generate and post",
@@ -60,6 +63,7 @@ export const PLAN_FEATURE_LABELS: Record<SubscriptionFeature, string> = {
 export const PLAN_FEATURES: Record<SubscriptionPlan, FeatureMap> = {
   free: {
     analytics: true,
+    negativeReviewAlerts: true,
     advancedAnalytics: false,
     aiGeneration: true,
     bulkActions: false,
@@ -68,6 +72,7 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, FeatureMap> = {
   },
   basic: {
     analytics: true,
+    negativeReviewAlerts: true,
     advancedAnalytics: false,
     aiGeneration: true,
     bulkActions: true,
@@ -76,6 +81,7 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, FeatureMap> = {
   },
   premium: {
     analytics: true,
+    negativeReviewAlerts: true,
     advancedAnalytics: true,
     aiGeneration: true,
     bulkActions: true,

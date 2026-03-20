@@ -80,6 +80,77 @@ export default function Dashboard() {
     hasEnsuredUserRef.current = true
   }, [])
 
+  const triggerAutoGenerateForReview = useCallback(async (review: ReviewWithAnalysis, accessToken: string) => {
+    try {
+      const res = await fetch("/api/auto-generate-reply", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          reviewId: review.id,
+          review_text: review.review_text,
+          rating: review.rating,
+        })
+      })
+
+      if (!res.ok) {
+        // Silent failure for auto-generation – don't disrupt user experience
+        console.debug(`Auto-generate failed for review ${review.id}:`, res.status)
+        return
+      }
+
+      const data = await res.json()
+
+      // Update the review with the auto-generated reply
+      setReviews((prevReviews) =>
+        prevReviews.map((r) =>
+          r.id === review.id && data.reply
+            ? {
+                ...r,
+                latest_reply: {
+                  id: r.latest_reply?.id || `auto-gen-${review.id}`,
+                  review_id: review.id,
+                  reply_text: data.reply,
+                  tone_base: data.tone?.base || null,
+                  tone_effective: data.tone?.effective || null,
+                  tone_adapted: data.tone?.adapted || false,
+                  source: "ai",
+                  status: "draft",
+                  created_at: new Date().toISOString(),
+                }
+              }
+            : r
+        )
+      )
+    } catch (error) {
+      console.debug(`Auto-generate error for review ${review.id}:`, error)
+      // Silent failure – don't block user workflow
+    }
+  }, [])
+
+  const autoGenerateReplies = useCallback(async (reviewsToProcess: ReviewWithAnalysis[], accessToken: string) => {
+    // Find actionable reviews with no replies (exclude historical backlog)
+    const needsAutoGen = reviewsToProcess.filter(
+      (review) => review.is_actionable && !review.latest_reply
+    )
+
+    if (needsAutoGen.length === 0) {
+      return
+    }
+
+    // Trigger auto-generation for each review (non-blocking)
+    // Limit to 3 concurrent requests to avoid overwhelming the server
+    const concurrencyLimit = 3
+    for (let i = 0; i < needsAutoGen.length; i += concurrencyLimit) {
+      const batch = needsAutoGen.slice(i, i + concurrencyLimit)
+      await Promise.all(
+        batch.map((review) => triggerAutoGenerateForReview(review, accessToken))
+      )
+    }
+  }, [triggerAutoGenerateForReview])
+
   const loadReviews = useCallback(async (businessId?: string, includeHistoricalBacklog = false) => {
 
     setLoading(true)
@@ -160,7 +231,12 @@ export default function Dashboard() {
     }
     setReviews(data.reviews)
     setLoading(false)
-  }, [ensureUserRecord])
+
+    // Trigger auto-generation only for current reviews, not historical backlog
+    if (accessToken && data.reviews.length > 0 && !includeHistoricalBacklog) {
+      autoGenerateReplies(data.reviews, accessToken)
+    }
+  }, [ensureUserRecord, autoGenerateReplies])
 
   const loadHistoricalBacklog = useCallback(async () => {
     if (historicalBacklogLoaded || loadingHistoricalBacklog) {

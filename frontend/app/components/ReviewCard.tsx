@@ -42,7 +42,7 @@ function formatReviewDate(value?: string) {
   if (!value) return ""
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return ""
-  return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+  return parsed.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })
 }
 
 function trimReviewPreview(text?: string, maxLength = 130) {

@@ -96,28 +96,10 @@ export default function ReviewList({
     setLocalReviews(reviews)
   }, [reviews])
 
-  function priorityScore(review: ReviewWithAnalysis) {
-    let score = 0
-    const sentiment = review.review_analysis?.[0]?.sentiment
-    const rating = Number(review.rating)
-    const status = review.latest_reply?.status
-
-    if (sentiment === "negative") score += 50
-    if (rating <= 2) score += 40
-    if (review.needs_ai_reply && review.is_actionable && !status) score += 35
-    if (status === "draft" || status === "failed" || status === "deleted") score += 30
-
-    return score
-  }
-
   const sortedReviews = useMemo(() => {
     return [...localReviews].sort((a, b) => {
-      const priorityDiff = priorityScore(b) - priorityScore(a)
-      if (priorityDiff !== 0) return priorityDiff
-
       const aTime = new Date(a.review_time ?? a.review_date ?? a.created_at).getTime()
       const bTime = new Date(b.review_time ?? b.review_date ?? b.created_at).getTime()
-
       return bTime - aTime
     })
   }, [localReviews])

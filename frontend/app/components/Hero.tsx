@@ -26,15 +26,15 @@ export default function Hero() {
 
           <div className="relative text-center">
             <div className="mb-5 inline-flex items-center rounded-full px-4 py-1.5 text-sm font-semibold" style={{ borderColor: 'var(--primary-200)', backgroundColor: 'var(--primary-50)', color: 'var(--primary-700)' }}>
-              Feedback intelligence for growing teams
+              Stay on top of every review
             </div>
 
             <h1 className="mx-auto mb-4 max-w-4xl text-4xl font-black tracking-tight md:text-5xl md:leading-[1.05]" style={{ color: 'var(--neutral-900)' }}>
-              Turn Customer Feedback Into AI-Powered Insights and Growth
+              Know what your customers are saying - and respond instantly
             </h1>
 
             <p className="mx-auto mb-8 max-w-2xl text-base leading-7 md:text-lg" style={{ color: 'var(--neutral-600)' }}>
-              Revora helps teams manage customer reviews with AI-powered replies, brand voice templates, instant negative-review alerts, and on-demand sentiment analysis with premium insight layers.
+              Manage and reply to reviews in seconds — with instant alerts for negative feedback and clear insights into what your customers are really saying.
             </p>
 
             <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -75,7 +75,7 @@ export default function Hero() {
               </div>
               <div className="rounded-2xl bg-white/80 p-4" style={{ borderColor: 'var(--neutral-200)', borderWidth: '1px' }}>
                 <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--neutral-500)' }}>Setup time</p>
-                <p className="mt-2 text-2xl font-black" style={{ color: 'var(--neutral-900)' }}>5 minutes</p>
+                <p className="mt-2 text-2xl font-black" style={{ color: 'var(--neutral-900)' }}>10 minutes</p>
               </div>
             </div>
           </div>
