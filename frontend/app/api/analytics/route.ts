@@ -147,6 +147,29 @@ export async function POST(req: NextRequest) {
     .select("id, rating, latest_reply_id, review_time, created_at")
     .eq("business_id", selectedBusinessId)
 
+  // Fetch unfiltered all-time counts so the stat cards always show totals, not range-scoped numbers.
+  // These are only needed when a date range is applied (Premium); Basic users get full data anyway.
+  const [totalReviewsAllTime, totalRepliesAllTime] = appliedRange
+    ? await Promise.all([
+        supabase
+          .from("reviews")
+          .select("id", { count: "exact", head: true })
+          .eq("business_id", selectedBusinessId)
+          .then(({ count }) => count ?? 0),
+        supabase
+          .from("review_replies")
+          .select("id", { count: "exact", head: true })
+          .in("review_id",
+            await supabase
+              .from("reviews")
+              .select("id")
+              .eq("business_id", selectedBusinessId)
+              .then(({ data }) => (data ?? []).map((r) => r.id))
+          )
+          .then(({ count }) => count ?? 0),
+      ])
+    : [null, null]
+
   if (appliedRange) {
     reviewsQuery = reviewsQuery
       .gte("review_time", appliedRange.startIso)
@@ -186,11 +209,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to load analysis", detail: analysisError.message }, { status: 500 })
   }
 
-  const { data: integrations } = await supabase
-    .from("integrations")
-    .select("provider")
-    .eq("user_id", user.id)
-
   const { data: subscriptions } = await supabase
     .from("subscriptions")
     .select("plan, status")
@@ -225,12 +243,17 @@ export async function POST(req: NextRequest) {
     : 0
 
   const ratingCount = { "1★": 0, "2★": 0, "3★": 0, "4★": 0, "5★": 0 }
+  let ratingSum = 0
+  let ratingValidCount = 0
   for (const review of reviews ?? []) {
     const rating = Number(review.rating)
     if (rating >= 1 && rating <= 5) {
       ratingCount[`${rating}★` as keyof typeof ratingCount] += 1
+      ratingSum += rating
+      ratingValidCount += 1
     }
   }
+  const avgRating = ratingValidCount > 0 ? Math.round((ratingSum / ratingValidCount) * 10) / 10 : 0
 
   const statusCount = { draft: 0, approved: 0, posted: 0, failed: 0, deleted: 0, none: 0 }
   const replyById = new Map((replies ?? []).map((r) => [r.id, r]))
@@ -278,11 +301,11 @@ export async function POST(req: NextRequest) {
 
   const analytics = {
     totals: {
-      reviews: reviews?.length ?? 0,
-      replies: replies?.length ?? 0,
-      analyses: analyses?.length ?? 0,
+      reviews: totalReviewsAllTime ?? reviews?.length ?? 0,
+      totalReviewsAllTime: totalReviewsAllTime ?? reviews?.length ?? 0,
+      replies: totalRepliesAllTime ?? replies?.length ?? 0,
+      avgRating,
       businesses: businesses.length,
-      integrations: integrations?.length ?? 0,
       plan: subscriptions?.[0]?.plan ?? resolvedPlan,
       subscriptionStatus: subscriptions?.[0]?.status ?? "active",
     },

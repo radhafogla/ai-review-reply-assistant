@@ -12,10 +12,10 @@ type DateRangePreset = "7d" | "30d" | "90d" | "custom"
 type AnalyticsPayload = {
   totals: {
     reviews: number
+    totalReviewsAllTime: number
     replies: number
-    analyses: number
+    avgRating: number
     businesses: number
-    integrations: number
     plan: string
     subscriptionStatus: string
   }
@@ -54,7 +54,7 @@ type SentimentCache = {
   analyzed_review_count: number
   analyzed_at: string
   themes: Record<string, { count: number; mentions: string[] }>
-  suggestions: { focus_areas: string[]; strengths: string[] }
+  suggestions: { focus_areas: string[]; strengths: string[]; basis?: string }
   sentiment_trend_by_day: Record<string, { positive: number; neutral: number; negative: number }>
 }
 
@@ -127,15 +127,15 @@ function PieChart({ title, data, palette }: { title: string; data: Bucket[]; pal
 
         <div style={{ display: "grid", gap: 8 }}>
           {segments.length === 0 ? (
-            <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>No data yet</p>
+            <p style={{ margin: 0, fontSize: 15, color: "#475569" }}>No data yet</p>
           ) : (
             segments.map((seg) => (
               <div key={seg.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ width: 10, height: 10, borderRadius: 99, backgroundColor: seg.color, display: "inline-block" }} />
-                  <span style={{ fontSize: 13, color: "#334155", fontWeight: 600 }}>{seg.label}</span>
+                  <span style={{ fontSize: 15, color: "#334155", fontWeight: 600 }}>{seg.label}</span>
                 </div>
-                <span style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>{seg.value} ({seg.percent}%)</span>
+                <span style={{ fontSize: 14, color: "#475569", fontWeight: 700 }}>{seg.value} ({seg.percent}%)</span>
               </div>
             ))
           )}
@@ -153,7 +153,7 @@ function TrendBars({ title, data, color }: { title: string; data: Bucket[]; colo
       <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f172a" }}>{title}</h3>
 
       {data.length === 0 ? (
-        <p style={{ marginTop: 12, marginBottom: 0, fontSize: 13, color: "#64748b" }}>No data in selected range</p>
+        <p style={{ marginTop: 12, marginBottom: 0, fontSize: 15, color: "#475569" }}>No data in selected range</p>
       ) : (
         <div style={{ marginTop: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))`, gap: 6, alignItems: "end", height: 150 }}>
@@ -205,11 +205,11 @@ function PremiumInsightCard({
         padding: 16,
       }}
     >
-      <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "#4f46e5" }}>
+      <div style={{ fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "#4f46e5" }}>
         {eyebrow}
       </div>
       <div style={{ marginTop: 8, fontSize: 16, fontWeight: 800, color: "#0f172a" }}>{title}</div>
-      <p style={{ margin: "8px 0 0", fontSize: 13, lineHeight: 1.6, color: "#475569" }}>{body}</p>
+      <p style={{ margin: "8px 0 0", fontSize: 15, lineHeight: 1.6, color: "#475569" }}>{body}</p>
     </div>
   )
 }
@@ -225,18 +225,18 @@ function StackedSentimentTrend({ title, data }: { title: string; data: Sentiment
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
           <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "#0f172a" }}>{title}</h3>
-          <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>Daily sentiment mix across the most recent 30 days.</p>
+          <p style={{ margin: "4px 0 0", fontSize: 14, color: "#475569" }}>Daily sentiment mix across the most recent 30 days.</p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569", fontWeight: 700 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, color: "#475569", fontWeight: 700 }}>
             <span style={{ width: 10, height: 10, borderRadius: 999, backgroundColor: "#22c55e", display: "inline-block" }} />
             Positive
           </span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569", fontWeight: 700 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, color: "#475569", fontWeight: 700 }}>
             <span style={{ width: 10, height: 10, borderRadius: 999, backgroundColor: "#f59e0b", display: "inline-block" }} />
             Neutral
           </span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569", fontWeight: 700 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, color: "#475569", fontWeight: 700 }}>
             <span style={{ width: 10, height: 10, borderRadius: 999, backgroundColor: "#ef4444", display: "inline-block" }} />
             Negative
           </span>
@@ -244,7 +244,7 @@ function StackedSentimentTrend({ title, data }: { title: string; data: Sentiment
       </div>
 
       {data.length === 0 ? (
-        <p style={{ margin: "16px 0 0", fontSize: 13, color: "#64748b" }}>No trend data yet.</p>
+        <p style={{ margin: "16px 0 0", fontSize: 15, color: "#475569" }}>No trend data yet.</p>
       ) : (
         <>
           <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))`, gap: 8, alignItems: "end", height: 220 }}>
@@ -382,16 +382,18 @@ export default function AnalyticsPage() {
           const cache = (await res.json()) as SentimentCache
           setSentimentCache(cache)
 
-          // Check staleness
-          if (analytics?.totals?.reviews && cache.analyzed_review_count) {
-            setIsStale(analytics.totals.reviews > cache.analyzed_review_count)
+          // Check staleness against the unfiltered total so date-range filtering
+          // on Premium doesn't suppress the re-analyze button.
+          const totalForStaleness = analytics?.totals?.totalReviewsAllTime ?? analytics?.totals?.reviews
+          if (totalForStaleness && cache.analyzed_review_count) {
+            setIsStale(totalForStaleness > cache.analyzed_review_count)
           }
         }
       } catch (err) {
         console.error("Failed to load sentiment cache", err)
       }
     },
-    [analytics?.totals?.reviews]
+    [analytics?.totals?.reviews, analytics?.totals?.totalReviewsAllTime]
   )
 
   const handleAnalyzeSentiment = useCallback(async (forceRefresh = false) => {
@@ -468,9 +470,10 @@ export default function AnalyticsPage() {
   const isPremiumPlan = (totals?.plan || subscription.plan).toLowerCase() === "premium"
   const advanced = analytics?.advanced
   const totalReviews = totals?.reviews ?? 0
+  const totalReviewsAllTime = totals?.totalReviewsAllTime ?? totalReviews
   const analyzedReviewCount = sentimentCache?.analyzed_review_count ?? 0
   const hasSentimentCache = Boolean(sentimentCache)
-  const newReviewsCount = Math.max(0, totalReviews - analyzedReviewCount)
+  const newReviewsCount = Math.max(0, totalReviewsAllTime - analyzedReviewCount)
   const isReanalyzeDisabled = sentimentLoading || (hasSentimentCache && !isStale)
   const sortedTrendData: SentimentTrendPoint[] = Object.entries(sentimentCache?.sentiment_trend_by_day ?? {})
     .sort(([left], [right]) => left.localeCompare(right))
@@ -483,16 +486,21 @@ export default function AnalyticsPage() {
     }))
     .slice(-30)
   const topThemes = Object.entries(sentimentCache?.themes ?? {})
-    .sort(([, left], [, right]) => (right.count ?? 0) - (left.count ?? 0))
+    .sort(([leftName, left], [rightName, right]) => {
+      const diff = (right.count ?? 0) - (left.count ?? 0)
+      return diff !== 0 ? diff : leftName.localeCompare(rightName)
+    })
     .slice(0, 6)
   const focusAreas = sentimentCache?.suggestions?.focus_areas ?? []
   const strengths = sentimentCache?.suggestions?.strengths ?? []
   const normalizedFocusAreas = focusAreas.map((value) => value.toLowerCase())
   const normalizedStrengths = strengths.map((value) => value.toLowerCase())
   const primaryTheme = topThemes[0]
-  const primaryFocusTitle = primaryTheme
-    ? `Fix ${primaryTheme[0]} concerns (mentioned in ${Math.round((primaryTheme[1].count / Math.max(analyzedReviewCount, 1)) * 100)}% of analyzed reviews)`
-    : (focusAreas[0] ?? "No primary focus detected yet")
+  // Prefer the cached focus_areas[0] (stable ordered array); fall back to top theme derivation
+  const primaryFocusTitle = focusAreas[0]
+    ?? (primaryTheme
+      ? `Fix ${primaryTheme[0]} concerns (mentioned in ${Math.round((primaryTheme[1].count / Math.max(analyzedReviewCount, 1)) * 100)}% of analyzed reviews)`
+      : "No primary focus detected yet")
 
   const getThemeSentimentContext = (theme: string): ThemeSentimentContext => {
     const normalizedTheme = theme.toLowerCase()
@@ -558,22 +566,22 @@ export default function AnalyticsPage() {
             <h1 style={{ fontSize: 30, fontWeight: 800, color: "#ffffff", margin: "8px 0 0", letterSpacing: "-0.4px" }}>
               Review insights
             </h1>
-            <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 6, maxWidth: 620 }}>
-              Snapshot across schema tables: reviews, replies, analysis, integrations, and subscription status.
+            <p style={{ fontSize: 14, color: "#475569", marginTop: 6, maxWidth: 620 }}>
+              Snapshot of your review activity: total reviews, replies, average rating, and subscription status.
             </p>
           </div>
 
           <div style={{ padding: "18px 24px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <label htmlFor="analytics-business-filter" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#64748b" }}>
+                <label htmlFor="analytics-business-filter" style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#475569" }}>
                   Business scope
                 </label>
                 <select
                   id="analytics-business-filter"
                   value={selectedBusinessId}
                   onChange={(e) => setSelectedBusinessId(e.target.value)}
-                  style={{ minWidth: 280, borderRadius: 10, border: "1.5px solid #cbd5e1", backgroundColor: "#fff", color: "#0f172a", fontSize: 13, fontWeight: 600, padding: "8px 12px", outline: "none" }}
+                  style={{ minWidth: 280, borderRadius: 10, border: "1.5px solid #cbd5e1", backgroundColor: "#fff", color: "#0f172a", fontSize: 15, fontWeight: 600, padding: "8px 12px", outline: "none" }}
                 >
                   {businesses.map((business) => (
                     <option key={business.id} value={business.id}>
@@ -581,7 +589,7 @@ export default function AnalyticsPage() {
                     </option>
                   ))}
                 </select>
-                {loading && <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>Loading...</span>}
+                {loading && <span style={{ fontSize: 14, color: "#475569", fontWeight: 600 }}>Loading...</span>}
               </div>
 
               <div style={{
@@ -589,7 +597,7 @@ export default function AnalyticsPage() {
                 backgroundColor: "#fff7ed", border: "1px solid #fdba74",
                 borderRadius: 99, padding: "6px 14px",
               }}>
-                <span style={{ fontSize: 12, color: "#9a3412", fontWeight: 700 }}>
+                <span style={{ fontSize: 14, color: "#9a3412", fontWeight: 700 }}>
                   Plan: {(totals?.plan || "free").toUpperCase()} ({totals?.subscriptionStatus || "active"})
                 </span>
               </div>
@@ -598,7 +606,7 @@ export default function AnalyticsPage() {
             <div style={{ marginTop: 12 }}>
               {canUsePremiumInsights ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#334155", textTransform: "uppercase", letterSpacing: "0.08em" }}>Range</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#334155", textTransform: "uppercase", letterSpacing: "0.08em" }}>Range</span>
                   <select
                     value={rangePreset}
                     onChange={(e) => setRangePreset(e.target.value as DateRangePreset)}
@@ -627,14 +635,14 @@ export default function AnalyticsPage() {
                     </>
                   )}
 
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#475569" }}>
                     {advanced?.range?.label ?? ""}
                   </span>
                 </div>
               ) : (
                 <div style={{ marginTop: 6, borderRadius: 12, border: "1px solid #cbd5e1", backgroundColor: "#f8fafc", padding: "10px 12px" }}>
-                  <p style={{ margin: 0, fontSize: 12, color: "#334155", fontWeight: 700 }}>Advanced analytics preview</p>
-                  <p style={{ marginTop: 4, marginBottom: 0, fontSize: 12, color: "#64748b" }}>
+                  <p style={{ margin: 0, fontSize: 14, color: "#334155", fontWeight: 700 }}>Advanced analytics preview</p>
+                  <p style={{ marginTop: 4, marginBottom: 0, fontSize: 14, color: "#475569" }}>
                     {getFeatureGateUpgradeHint("advancedAnalytics")}
                   </p>
                 </div>
@@ -650,40 +658,36 @@ export default function AnalyticsPage() {
                 <div style={{ fontSize: 14, color: "#065f46", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Replies</div>
                 <div style={{ fontSize: 26, fontWeight: 800, color: "#14532d", marginTop: 8 }}>{totals?.replies ?? 0}</div>
               </div>
-              <div style={{ borderRadius: 14, backgroundColor: "#eff6ff", border: "1.5px solid #bfdbfe", padding: "14px 18px" }}>
-                <div style={{ fontSize: 14, color: "#1d4ed8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Analysis rows</div>
-                <div style={{ fontSize: 26, fontWeight: 800, color: "#1e3a8a", marginTop: 8 }}>{totals?.analyses ?? 0}</div>
-              </div>
-              <div style={{ borderRadius: 14, backgroundColor: "#fefce8", border: "1.5px solid #fde68a", padding: "14px 18px" }}>
-                <div style={{ fontSize: 14, color: "#854d0e", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Integrations</div>
-                <div style={{ fontSize: 26, fontWeight: 800, color: "#78350f", marginTop: 8 }}>{totals?.integrations ?? 0}</div>
+              <div style={{ borderRadius: 14, backgroundColor: "#fdf4ff", border: "1.5px solid #e9d5ff", padding: "14px 18px" }}>
+                <div style={{ fontSize: 14, color: "#7e22ce", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Avg. rating</div>
+                <div style={{ fontSize: 26, fontWeight: 800, color: "#581c87", marginTop: 8 }}>{totals?.avgRating != null ? `${totals.avgRating} ★` : "—"}</div>
               </div>
             </div>
 
             {isPremiumPlan && (
               <div style={{ marginTop: 16, borderRadius: 14, border: "1.5px solid #c7d2fe", backgroundColor: "#eef2ff", padding: "14px 16px" }}>
-                <div style={{ fontSize: 11, color: "#3730a3", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                <div style={{ fontSize: 13, color: "#3730a3", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em" }}>
                   Premium auto-reply metrics
                 </div>
 
                 <div style={{ marginTop: 12, display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
                   <div style={{ borderRadius: 10, backgroundColor: "#ffffff", border: "1px solid #e0e7ff", padding: "10px 12px" }}>
-                    <div style={{ fontSize: 11, color: "#4338ca", fontWeight: 700, textTransform: "uppercase" }}>Attempted</div>
+                    <div style={{ fontSize: 13, color: "#4338ca", fontWeight: 700, textTransform: "uppercase" }}>Attempted</div>
                     <div style={{ fontSize: 24, color: "#1e1b4b", fontWeight: 800 }}>{premium?.autoReplyAttempted ?? 0}</div>
                   </div>
 
                   <div style={{ borderRadius: 10, backgroundColor: "#ffffff", border: "1px solid #dcfce7", padding: "10px 12px" }}>
-                    <div style={{ fontSize: 11, color: "#166534", fontWeight: 700, textTransform: "uppercase" }}>Posted</div>
+                    <div style={{ fontSize: 13, color: "#166534", fontWeight: 700, textTransform: "uppercase" }}>Posted</div>
                     <div style={{ fontSize: 24, color: "#14532d", fontWeight: 800 }}>{premium?.autoReplyPosted ?? 0}</div>
                   </div>
 
                   <div style={{ borderRadius: 10, backgroundColor: "#ffffff", border: "1px solid #fecaca", padding: "10px 12px" }}>
-                    <div style={{ fontSize: 11, color: "#b91c1c", fontWeight: 700, textTransform: "uppercase" }}>Failed</div>
+                    <div style={{ fontSize: 13, color: "#b91c1c", fontWeight: 700, textTransform: "uppercase" }}>Failed</div>
                     <div style={{ fontSize: 24, color: "#991b1b", fontWeight: 800 }}>{premium?.autoReplyFailed ?? 0}</div>
                   </div>
 
                   <div style={{ borderRadius: 10, backgroundColor: "#ffffff", border: "1px solid #bfdbfe", padding: "10px 12px" }}>
-                    <div style={{ fontSize: 11, color: "#1d4ed8", fontWeight: 700, textTransform: "uppercase" }}>Success rate</div>
+                    <div style={{ fontSize: 13, color: "#1d4ed8", fontWeight: 700, textTransform: "uppercase" }}>Success rate</div>
                     <div style={{ fontSize: 24, color: "#1e3a8a", fontWeight: 800 }}>{premium?.autoReplySuccessRate ?? 0}%</div>
                   </div>
                 </div>
@@ -697,14 +701,14 @@ export default function AnalyticsPage() {
           <div style={{ marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             <div>
               <h2 style={{ margin: 0, fontSize: 20, color: "#0f172a", fontWeight: 800 }}>Sentiment analysis</h2>
-              <p style={{ marginTop: 6, marginBottom: 0, color: "#64748b", fontSize: 13 }}>
+              <p style={{ marginTop: 6, marginBottom: 0, color: "#475569", fontSize: 15 }}>
                 Manual analysis for Basic and Premium. Premium adds deeper AI insight cards and trend views.
               </p>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
               {hasSentimentCache && !isStale && (
-                <span style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>
+                <span style={{ fontSize: 14, color: "#475569", fontWeight: 700 }}>
                   Re-analyze unlocks when new reviews are synced.
                 </span>
               )}
@@ -717,7 +721,7 @@ export default function AnalyticsPage() {
                   border: "1.5px solid #e2e8f0",
                   backgroundColor: isReanalyzeDisabled ? "#e2e8f0" : "#ffffff",
                   color: isReanalyzeDisabled ? "#94a3b8" : "#0f172a",
-                  fontSize: 13,
+                  fontSize: 15,
                   fontWeight: 700,
                   cursor: isReanalyzeDisabled ? "not-allowed" : "pointer",
                   transition: "all 0.2s"
@@ -751,7 +755,7 @@ export default function AnalyticsPage() {
               borderRadius: 12,
               padding: 12,
               marginBottom: 14,
-              fontSize: 13,
+              fontSize: 15,
               color: "#166534",
               fontWeight: 600
             }}>
@@ -766,7 +770,7 @@ export default function AnalyticsPage() {
               borderRadius: 12,
               padding: 12,
               marginBottom: 14,
-              fontSize: 13,
+              fontSize: 15,
               color: "#1e40af",
               fontWeight: 600
             }}>
@@ -822,13 +826,13 @@ export default function AnalyticsPage() {
             boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
           }}>
             <div style={{ backgroundColor: "#0f172a", padding: "24px 32px" }}>
-              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "#a5b4fc", margin: 0 }}>
+              <p style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "#a5b4fc", margin: 0 }}>
                 Premium analytics
               </p>
               <h2 style={{ fontSize: 30, fontWeight: 800, color: "#ffffff", margin: "8px 0 0", letterSpacing: "-0.4px" }}>
                 Premium Insight Layer
               </h2>
-              <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 6, maxWidth: 700 }}>
+              <p style={{ fontSize: 15, color: "#64748b", marginTop: 6, maxWidth: 700 }}>
                 Recurring themes, AI recommended actions, and sentiment movement context beyond the standard sentiment split.
               </p>
             </div>
@@ -859,7 +863,7 @@ export default function AnalyticsPage() {
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                         <div>
                           <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "#0f172a" }}>Recurring themes</h3>
-                          <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>Most-mentioned topics found in the latest analysis snapshot.</p>
+                          <p style={{ margin: "4px 0 0", fontSize: 14, color: "#475569" }}>Most-mentioned topics found in the latest analysis snapshot.</p>
                         </div>
                       </div>
                       <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
@@ -868,11 +872,11 @@ export default function AnalyticsPage() {
                           return (
                             <div key={theme} style={{ display: "grid", gap: 6 }}>
                               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                                <span style={{ fontSize: 13, color: "#0f172a", fontWeight: 700, textTransform: "capitalize" }}>{theme}</span>
-                                <span style={{ fontSize: 12, color: "#6366f1", fontWeight: 800 }}>{data.count} mentions</span>
-                              </div>
-                              <div style={{ fontSize: 12, fontWeight: 700, color: context.toneColor }}>
-                                {`${theme} -> ${context.emoji} ${context.label}`}
+                                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                                  <span style={{ fontSize: 15, color: "#0f172a", fontWeight: 700, textTransform: "capitalize" }}>{theme}</span>
+                                  <span style={{ fontSize: 14, fontWeight: 700, color: context.toneColor }}>{context.emoji} {context.label}</span>
+                                </span>
+                                <span style={{ fontSize: 14, color: "#6366f1", fontWeight: 800, whiteSpace: "nowrap" }}>{data.count} mentions</span>
                               </div>
                               <div style={{ height: 8, borderRadius: 999, backgroundColor: "#e2e8f0", overflow: "hidden" }}>
                                 <div
@@ -897,36 +901,39 @@ export default function AnalyticsPage() {
                 <div style={{ display: "grid", gap: 16 }}>
                   <div style={{ borderRadius: 16, border: "1px solid #e2e8f0", backgroundColor: "#ffffff", padding: 18 }}>
                     <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "#0f172a" }}>AI Recommended actions</h3>
-                    <p style={{ margin: "6px 0 0", fontSize: 12, color: "#64748b" }}>Use these cues to decide where to respond, retrain staff, or adjust operations.</p>
+                    <p style={{ margin: "6px 0 0", fontSize: 14, color: "#475569" }}>Use these cues to decide where to respond, retrain staff, or adjust operations.</p>
+                    {sentimentCache.suggestions?.basis && (
+                      <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>Based on {sentimentCache.suggestions.basis}</p>
+                    )}
 
                     <div style={{ marginTop: 16, display: "grid", gap: 14 }}>
                       <div>
-                        <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "#ef4444" }}>Focus areas</div>
+                        <div style={{ fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "#ef4444" }}>Focus areas</div>
                         {(sentimentCache.suggestions?.focus_areas?.length ?? 0) > 0 ? (
                           <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
                             {(sentimentCache.suggestions?.focus_areas ?? []).map((area, idx) => (
-                              <div key={idx} style={{ borderRadius: 12, backgroundColor: "#fff7ed", border: "1px solid #fdba74", padding: "10px 12px", fontSize: 13, color: "#9a3412", fontWeight: 600 }}>
+                              <div key={idx} style={{ borderRadius: 12, backgroundColor: "#fff7ed", border: "1px solid #fdba74", padding: "10px 12px", fontSize: 15, color: "#9a3412", fontWeight: 600 }}>
                                 {area}
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <p style={{ margin: "10px 0 0", fontSize: 13, color: "#64748b" }}>No focus areas were surfaced in this analysis yet.</p>
+                          <p style={{ margin: "10px 0 0", fontSize: 15, color: "#475569" }}>No focus areas were surfaced in this analysis yet.</p>
                         )}
                       </div>
 
                       <div>
-                        <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "#16a34a" }}>Strengths</div>
+                        <div style={{ fontSize: 13, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "#16a34a" }}>Strengths</div>
                         {(sentimentCache.suggestions?.strengths?.length ?? 0) > 0 ? (
                           <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
                             {(sentimentCache.suggestions?.strengths ?? []).map((strength, idx) => (
-                              <div key={idx} style={{ borderRadius: 12, backgroundColor: "#f0fdf4", border: "1px solid #86efac", padding: "10px 12px", fontSize: 13, color: "#166534", fontWeight: 600 }}>
+                              <div key={idx} style={{ borderRadius: 12, backgroundColor: "#f0fdf4", border: "1px solid #86efac", padding: "10px 12px", fontSize: 15, color: "#166534", fontWeight: 600 }}>
                                 {strength}
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <p style={{ margin: "10px 0 0", fontSize: 13, color: "#64748b" }}>No standout strengths were surfaced in this analysis yet.</p>
+                          <p style={{ margin: "10px 0 0", fontSize: 15, color: "#475569" }}>No standout strengths were surfaced in this analysis yet.</p>
                         )}
                       </div>
                     </div>
@@ -941,7 +948,7 @@ export default function AnalyticsPage() {
           <section style={{ marginTop: 20 }}>
             <div style={{ marginBottom: 10 }}>
               <h2 style={{ margin: 0, fontSize: 20, color: "#0f172a", fontWeight: 800 }}>Premium trend views</h2>
-              <p style={{ marginTop: 6, marginBottom: 0, color: "#64748b", fontSize: 13 }}>
+              <p style={{ marginTop: 6, marginBottom: 0, color: "#475569", fontSize: 15 }}>
                 Daily movement across reviews, posted replies, and negative sentiment.
               </p>
             </div>

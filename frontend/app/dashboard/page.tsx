@@ -211,7 +211,7 @@ export default function Dashboard() {
             <h1 style={{ fontSize: 30, fontWeight: 800, color: "#ffffff", margin: "6px 0 0", letterSpacing: "-0.5px" }}>
               Customer reply desk
             </h1>
-            <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 5, maxWidth: 560 }}>
+            <p style={{ fontSize: 14, color: "#94a3b8", marginTop: 5, maxWidth: 560 }}>
               Two-lane workflow — act on reviews that need attention, track what&#39;s already posted.
             </p>
           </div>

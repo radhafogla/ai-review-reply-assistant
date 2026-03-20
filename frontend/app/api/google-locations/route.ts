@@ -7,6 +7,41 @@ import { createServerClient } from "@/lib/supabaseServerClient"
 import { GoogleLocation } from "@/app/types/location"
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
 
+function extractCategoryLabel(category: unknown): string | null {
+  if (!category || typeof category !== "object") {
+    return null
+  }
+
+  const value = category as { displayName?: unknown; name?: unknown }
+
+  if (typeof value.displayName === "string" && value.displayName.trim().length > 0) {
+    return value.displayName.trim()
+  }
+
+  if (typeof value.name === "string" && value.name.trim().length > 0) {
+    return value.name.trim()
+  }
+
+  return null
+}
+
+function extractAdditionalCategoryLabels(rawCategories: unknown): string[] {
+  if (!Array.isArray(rawCategories)) {
+    return []
+  }
+
+  const seen = new Set<string>()
+
+  for (const raw of rawCategories) {
+    const label = extractCategoryLabel(raw)
+    if (label) {
+      seen.add(label)
+    }
+  }
+
+  return Array.from(seen)
+}
+
 export async function GET(req: NextRequest) {
   const endpoint = "/api/google-locations"
   const requestId = createRequestId()
@@ -61,13 +96,23 @@ export async function GET(req: NextRequest) {
     const locationsData = await locationsRes.json()
 
     const accountId = account.name.split("/").pop() || ""
-    const locations: GoogleLocation[] = (locationsData.locations || []).map((loc: GoogleLocation) => ({
-      locationId: loc.name.split("/").pop(),
-      name: loc.title || loc.name,
-      accountId,
-      title: loc.title,
-      address: loc.address,
-    }))
+    const locations: GoogleLocation[] = (locationsData.locations || []).map((loc: GoogleLocation & {
+      primaryCategory?: unknown
+      additionalCategories?: unknown
+    }) => {
+      const primaryCategory = extractCategoryLabel(loc.primaryCategory)
+      const additionalCategories = extractAdditionalCategoryLabels(loc.additionalCategories)
+
+      return {
+        locationId: loc.name.split("/").pop(),
+        name: loc.title || loc.name,
+        accountId,
+        title: loc.title,
+        address: loc.address,
+        primaryCategory,
+        additionalCategories,
+      }
+    })
 
     return NextResponse.json({ locations })
 

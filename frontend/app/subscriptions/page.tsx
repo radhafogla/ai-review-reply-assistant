@@ -127,7 +127,7 @@ export default function SubscriptionsPage() {
             <h1 style={{ margin: "8px 0 0", fontSize: 30, fontWeight: 800, color: "#fff", letterSpacing: "-0.4px" }}>
               Subscription management
             </h1>
-            <p style={{ marginTop: 8, marginBottom: 0, maxWidth: 680, fontSize: 13, color: "#94a3b8" }}>
+            <p style={{ marginTop: 8, marginBottom: 0, maxWidth: 680, fontSize: 14, color: "#94a3b8" }}>
               Choose your plan and instantly control which pages and features are enabled.
             </p>
           </div>
@@ -244,7 +244,7 @@ export default function SubscriptionsPage() {
         {subscription.plan === "premium" && (
           <section style={{ marginTop: 20, border: "1px solid #e2e8f0", borderRadius: 16, backgroundColor: "#fff", padding: 18 }}>
             <h3 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#0f172a" }}>Premium auto-reply</h3>
-            <p style={{ margin: "8px 0 0", fontSize: 13, color: "#475569" }}>
+            <p style={{ margin: "8px 0 0", fontSize: 14, color: "#475569" }}>
               Automatically generate and post replies for high-rating reviews after sync. Default is OFF.
             </p>
 

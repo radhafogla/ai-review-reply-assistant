@@ -4,4 +4,6 @@ export interface GoogleLocation {
   address: string;
   locationId: string;
   accountId: string;
+  primaryCategory?: string | null;
+  additionalCategories?: string[];
 }

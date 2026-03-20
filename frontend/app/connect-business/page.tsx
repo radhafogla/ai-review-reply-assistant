@@ -214,6 +214,8 @@ function ConnectBusinessContent() {
           external_business_id: location.locationId,
           platform: "google",
           name: location.name,
+          primary_category: location.primaryCategory ?? null,
+          additional_categories: Array.isArray(location.additionalCategories) ? location.additionalCategories : [],
         }),
       })
 
@@ -264,7 +266,7 @@ function ConnectBusinessContent() {
             <h1 style={{ margin: "8px 0 0", fontSize: 30, fontWeight: 800, color: "#fff", letterSpacing: "-0.4px" }}>
               Connect and manage businesses
             </h1>
-            <p style={{ marginTop: 8, marginBottom: 0, maxWidth: 680, fontSize: 13, color: "#94a3b8" }}>
+            <p style={{ marginTop: 8, marginBottom: 0, maxWidth: 680, fontSize: 14, color: "#94a3b8" }}>
               Keep your connected locations in one place. Add another business anytime and choose where reviews sync from.
             </p>
           </div>

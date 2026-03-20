@@ -8,6 +8,31 @@ import type { NextRequest } from "next/server"
 
 const SUPPORTED_PLATFORMS = new Set(["google", "yelp", "facebook"])
 
+function toNullableTrimmedString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null
+  }
+
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  const unique = new Set<string>()
+
+  for (const item of value) {
+    if (typeof item === "string" && item.trim().length > 0) {
+      unique.add(item.trim())
+    }
+  }
+
+  return Array.from(unique)
+}
+
 export async function POST(req: NextRequest) {
   const endpoint = "/api/save-business"
   const requestId = createRequestId()
@@ -30,6 +55,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
 
     const { account_id, external_business_id, platform: rawPlatform, name } = body
+    const primaryCategory = toNullableTrimmedString(body?.primary_category)
+    const additionalCategories = toStringArray(body?.additional_categories)
     const platform = typeof rawPlatform === "string" ? rawPlatform.toLowerCase() : "google"
     logApiRequest({ requestId, endpoint, userId: user.id, accountId: account_id, locationId: external_business_id })
 
@@ -86,6 +113,8 @@ export async function POST(req: NextRequest) {
           external_business_id,
           name,
           platform,
+          primary_category: primaryCategory,
+          additional_categories: additionalCategories,
         },
         {
           onConflict: "user_id,external_business_id,platform"

@@ -57,6 +57,8 @@ CREATE TABLE IF NOT EXISTS "public"."businesses" (
     "sync_status" "text" DEFAULT 'pending'::"text",
     "sync_error" "text",
     "reply_tone" "text" DEFAULT 'professional'::"text",
+    "primary_category" "text",
+    "additional_categories" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
     "platform" "text" DEFAULT 'google'::"text" NOT NULL,
     CONSTRAINT "businesses_platform_check" CHECK (("platform" = ANY (ARRAY['google'::"text", 'yelp'::"text", 'facebook'::"text"])))
 );

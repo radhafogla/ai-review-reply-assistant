@@ -399,7 +399,7 @@ export default function ReviewCard({
             <p
               style={{
                 margin: 0,
-                fontSize: 13,
+                fontSize: 14,
                 fontWeight: 600,
                 color: "#334155",
                 whiteSpace: "nowrap",
@@ -454,7 +454,7 @@ export default function ReviewCard({
                   marginTop: 10, width: "100%", boxSizing: "border-box", resize: "vertical",
                   borderRadius: 10, border: `1.5px solid ${isDeleted ? "#fda4af" : "#fcd34d"}`,
                   backgroundColor: "#ffffff", padding: "10px 12px",
-                  fontSize: 13, color: "#1e293b", outline: "none", fontFamily: "inherit",
+                  fontSize: 14, color: "#1e293b", outline: "none", fontFamily: "inherit",
                 }}
               />
 

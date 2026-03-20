@@ -30,8 +30,12 @@ type Review = {
 }
 
 type Topics = Record<string, { count: number; mentions: string[] }>
-type Suggestions = { focus_areas: string[]; strengths: string[] }
+type Suggestions = { focus_areas: string[]; strengths: string[]; basis?: string }
 type SentimentTrend = Record<string, SentimentCount>
+
+const SUGGESTIONS_WINDOW_DAYS = 90
+const SUGGESTIONS_MIN_THRESHOLD = 1
+const SUGGESTIONS_FALLBACK_COUNT = 10
 
 function formatYmd(date: Date): string {
   return date.toISOString().slice(0, 10)
@@ -120,9 +124,12 @@ function extractTopics(analyses: ReviewAnalysis[]): Topics {
 
 async function generateSuggestions(
   supabase: SupabaseClient,
+  businessCategory: string | null,
+  additionalCategories: string[],
   reviews: Review[],
   analyses: ReviewAnalysis[],
-  sentimentCounts: SentimentCount
+  sentimentCounts: SentimentCount,
+  basis: string
 ): Promise<Suggestions> {
   const negativeAnalyses = analyses.filter((a) => (a.sentiment || "").toLowerCase() === "negative")
   const positiveAnalyses = analyses.filter((a) => (a.sentiment || "").toLowerCase() === "positive")
@@ -132,20 +139,31 @@ async function generateSuggestions(
 
   const topNegative = [...new Set(negativeTopics)].slice(0, 5)
   const topPositive = [...new Set(positiveTopics)].slice(0, 5)
+  const categoryContext = businessCategory && businessCategory.length > 0
+    ? businessCategory
+    : "general business"
+  const additionalCategoryContext = additionalCategories.length > 0
+    ? additionalCategories.slice(0, 5).join(", ")
+    : "none"
 
   const prompt = `
 Based on this review analysis, provide business improvement suggestions.
 
+Business category (primary): ${categoryContext}
+Business categories (additional): ${additionalCategoryContext}
+
+Review window used for suggestions: ${basis} (${reviews.length} reviews)
 Negative mentions (top issues): ${topNegative.join(", ")}
 Positive mentions (strengths): ${topPositive.join(", ")}
 Sentiment breakdown: ${sentimentCounts.positive} positive, ${sentimentCounts.neutral} neutral, ${sentimentCounts.negative} negative
-Total reviews analyzed: ${reviews.length}
 
 Return JSON with:
 focus_areas (array of 3-5 specific areas to improve)
 strengths (array of 3-5 strengths to highlight in marketing)
 
-Be concise and actionable.
+Be concise and actionable. Only flag an area as needing improvement if it appears in the recent reviews provided — do not surface issues from older data not in this window.
+
+If business category data is available, use it to provide category-specific recommendations.
 `
 
   const completion = await openai.chat.completions.create({
@@ -154,7 +172,8 @@ Be concise and actionable.
     response_format: { type: "json_object" }
   })
 
-  return JSON.parse(completion.choices[0].message.content ?? '{"focus_areas":[],"strengths":[]}')
+  const result = JSON.parse(completion.choices[0].message.content ?? '{"focus_areas":[],"strengths":[]}')
+  return { ...result, basis }
 }
 
 function compute30DaySentimentTrend(
@@ -239,7 +258,7 @@ export async function POST(req: NextRequest) {
   // Verify business ownership
   const { data: business, error: businessError } = await supabase
     .from("businesses")
-    .select("id")
+    .select("id, primary_category, additional_categories")
     .eq("id", businessId)
     .eq("user_id", user.id)
     .maybeSingle()
@@ -265,6 +284,12 @@ export async function POST(req: NextRequest) {
 
   const userPlan = userRow?.plan || "free"
   const canUsePremium = hasFeature(userPlan, "advancedAnalytics")
+  const businessPrimaryCategory = typeof business?.primary_category === "string"
+    ? business.primary_category
+    : null
+  const businessAdditionalCategories = Array.isArray(business?.additional_categories)
+    ? business.additional_categories.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    : []
 
   logApiRequest({ requestId, endpoint, userId: user.id, businessId })
 
@@ -311,8 +336,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Analyze all reviews
-    const analyses = []
+    // Analyze all reviews (all-time, for accurate sentiment counts)
+    const analyses: ReviewAnalysis[] = []
     for (const review of reviews ?? []) {
       const analysis = await ensureReviewAnalyzed(
         supabase,
@@ -323,13 +348,52 @@ export async function POST(req: NextRequest) {
       analyses.push(analysis)
     }
 
-    // Count sentiments
+    // Build a map for efficient review → analysis lookups
+    const analysisMap = new Map<string, ReviewAnalysis>()
+    for (let i = 0; i < (reviews ?? []).length; i++) {
+      if (reviews![i]) analysisMap.set(reviews![i].id, analyses[i])
+    }
+
+    // Count sentiments across ALL reviews (the all-time score)
     const sentimentCounts: SentimentCount = { positive: 0, neutral: 0, negative: 0 }
     for (const analysis of analyses) {
       const sentiment = (analysis.sentiment || "").toLowerCase()
       if (sentiment in sentimentCounts) {
         sentimentCounts[sentiment as keyof SentimentCount] += 1
       }
+    }
+
+    // Select the review window for AI suggestions:
+    // Prefer last SUGGESTIONS_WINDOW_DAYS days; fall back to most recent SUGGESTIONS_FALLBACK_COUNT if too few.
+    const windowCutoff = new Date()
+    windowCutoff.setDate(windowCutoff.getDate() - SUGGESTIONS_WINDOW_DAYS)
+
+    const recentReviews = (reviews ?? []).filter(
+      (r) => new Date(r.review_time || r.created_at) >= windowCutoff
+    )
+
+    let suggestionReviews: Review[]
+    let suggestionsBasis: string
+    if (recentReviews.length >= SUGGESTIONS_MIN_THRESHOLD) {
+      suggestionReviews = recentReviews
+      suggestionsBasis = `last ${SUGGESTIONS_WINDOW_DAYS} days`
+    } else {
+      const sorted = [...(reviews ?? [])].sort(
+        (a, b) => new Date(b.review_time || b.created_at).getTime() - new Date(a.review_time || a.created_at).getTime()
+      )
+      suggestionReviews = sorted.slice(0, SUGGESTIONS_FALLBACK_COUNT)
+      suggestionsBasis = `most recent ${suggestionReviews.length} reviews`
+    }
+
+    const suggestionAnalyses = suggestionReviews
+      .map((r) => analysisMap.get(r.id))
+      .filter((a): a is ReviewAnalysis => a !== undefined)
+
+    // Sentiment counts scoped to the suggestion window (for accurate prompt context)
+    const recentSentimentCounts: SentimentCount = { positive: 0, neutral: 0, negative: 0 }
+    for (const a of suggestionAnalyses) {
+      const s = (a.sentiment || "").toLowerCase()
+      if (s in recentSentimentCounts) recentSentimentCounts[s as keyof SentimentCount] += 1
     }
 
     let themes: Topics = {}
@@ -339,7 +403,15 @@ export async function POST(req: NextRequest) {
     // Premium features
     if (canUsePremium && analyses.length > 0) {
       themes = extractTopics(analyses)
-      suggestions = await generateSuggestions(supabase, reviews ?? [], analyses, sentimentCounts)
+      suggestions = await generateSuggestions(
+        supabase,
+        businessPrimaryCategory,
+        businessAdditionalCategories,
+        suggestionReviews,
+        suggestionAnalyses,
+        recentSentimentCounts,
+        suggestionsBasis
+      )
       sentimentTrendByDay = compute30DaySentimentTrend(reviews ?? [], analyses)
     }
 
