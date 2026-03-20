@@ -161,7 +161,7 @@ function compute30DaySentimentTrend(
   reviews: Review[],
   analyses: ReviewAnalysis[]
 ): SentimentTrend {
-  const analysisMap = new Map(analyses.map((a) => [a.review_id, a]))
+  const analysisMap = new Map(analyses.map((a, idx) => [reviews[idx]?.id || idx.toString(), a]))
   const trendMap = new Map<string, SentimentCount>()
 
   // Last 30 days

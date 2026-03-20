@@ -100,6 +100,27 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const { error: membershipError } = await supabase
+      .from("business_members")
+      .upsert(
+        {
+          business_id: data.id,
+          user_id: user.id,
+          role: "owner",
+          status: "active",
+        },
+        {
+          onConflict: "business_id,user_id"
+        }
+      )
+
+    if (membershipError) {
+      return NextResponse.json(
+        { error: membershipError.message },
+        { status: 500 }
+      )
+    }
+
     await trackUsageEvent({
       requestId,
       endpoint,

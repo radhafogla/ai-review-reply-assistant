@@ -5,6 +5,7 @@ import { createServerClient, createServiceClient } from "@/lib/supabaseServerCli
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger";
 import { trackUsageEvent } from "@/lib/usageTracking";
 import { getReplyTonePromptGuidance, normalizeReplyTone, resolveAdaptiveReplyTone } from "@/lib/replyTone";
+import { assertBusinessRole } from "@/lib/businessAccess";
 
 const MAX_GENERATIONS_PER_REVIEW = 5;
 
@@ -63,6 +64,31 @@ export async function POST(req: NextRequest) {
   const { reviewId, review_text, rating } = await req.json();
   logApiRequest({ requestId, endpoint, userId: user.id, reviewId });
 
+  const { data: reviewRow, error: reviewError } = await supabase
+    .from("reviews")
+    .select("id, business_id")
+    .eq("id", reviewId)
+    .maybeSingle();
+
+  if (reviewError || !reviewRow?.business_id) {
+    logApiError({
+      requestId,
+      endpoint,
+      userId: user.id,
+      status: 404,
+      message: "Review not found before generate-reply",
+      error: reviewError?.message ?? "review_not_found",
+      reviewId,
+    });
+    return NextResponse.json({ error: "Review not found" }, { status: 404 });
+  }
+
+  const access = await assertBusinessRole(user.id, reviewRow.business_id, supabase, "responder")
+  if (access.error) {
+    logApiError({ requestId, endpoint, userId: user.id, status: 403, message: "Insufficient business role for generate-reply", error: access.error, reviewId, businessId: reviewRow.business_id })
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+
   const serviceSupabase = createServiceClient();
 
   const { data: reviewForLimit } = await supabase
@@ -104,12 +130,6 @@ export async function POST(req: NextRequest) {
   let baseTone = normalizeReplyTone(null);
   let effectiveTone = baseTone;
   let toneInstruction = getReplyTonePromptGuidance(effectiveTone);
-
-  const { data: reviewRow } = await supabase
-    .from("reviews")
-    .select("business_id")
-    .eq("id", reviewId)
-    .maybeSingle();
 
   if (reviewRow?.business_id) {
     const { data: businessRow } = await supabase

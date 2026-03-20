@@ -190,7 +190,7 @@ function TrendBars({ title, data, color }: { title: string; data: Bucket[]; colo
 function PremiumInsightCard({
   eyebrow,
   title,
-  body,
+  body
 }: {
   eyebrow: string
   title: string
@@ -857,8 +857,7 @@ export default function AnalyticsPage() {
                 <PremiumInsightCard
                   eyebrow="Primary focus"
                   title={primaryFocusTitle}
-                  body="This is the top operational issue recurring in your latest analyzed review set."
-                  whyThisMatters={recentNegativeShare > 0 ? `Negative sentiment currently sits at ${Math.round(recentNegativeShare)}%, so resolving this issue can move overall sentiment faster.` : "Addressing recurring issues helps prevent new negative review clusters."}
+                  body={`This is the top operational issue recurring in your latest analyzed review set.}`}
                 />
                 <PremiumInsightCard
                   eyebrow="Strongest signal"

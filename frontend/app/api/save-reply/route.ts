@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { createServerClient, createServiceClient } from "@/lib/supabaseServerClient";
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger";
 import { trackUsageEvent } from "@/lib/usageTracking";
+import { assertBusinessRole } from "@/lib/businessAccess";
 
 export async function POST(req: NextRequest) {
   const endpoint = "/api/save-reply"
@@ -27,6 +28,22 @@ export async function POST(req: NextRequest) {
 
   const { reviewId, replyText } = await req.json();
   logApiRequest({ requestId, endpoint, userId: user.id, reviewId });
+
+  const { data: review, error: reviewError } = await supabase
+    .from("reviews")
+    .select("id, business_id")
+    .eq("id", reviewId)
+    .maybeSingle()
+
+  if (reviewError || !review?.business_id) {
+    return NextResponse.json({ error: "Review not found" }, { status: 404 })
+  }
+
+  const access = await assertBusinessRole(user.id, review.business_id, supabase, "responder")
+  if (access.error) {
+    logApiError({ requestId, endpoint, userId: user.id, status: 403, message: "Insufficient business role for save-reply", error: access.error, reviewId, businessId: review.business_id })
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
 
   const serviceSupabase = createServiceClient();
 

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createServerClient } from "@/lib/supabaseServerClient";
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger";
+import { listAccessibleBusinesses } from "@/lib/businessAccess";
+import { type BusinessMemberRole } from "@/lib/businessRoles";
 
 export async function POST(req: NextRequest) {
   const endpoint = "/api/get-reviews";
@@ -49,11 +51,11 @@ export async function POST(req: NextRequest) {
       ? body.businessId.trim()
       : null;
 
-  const { data: businesses, error: businessesError } = await supabase
-    .from("businesses")
-    .select("id, name")
-    .eq("user_id", userId)
-    .order("id", { ascending: true });
+  const { businesses: accessibleBusinesses, error: businessesError } = await listAccessibleBusinesses(userId, supabase)
+
+  const businesses = accessibleBusinesses
+    .map((business) => ({ id: business.id, name: business.name, role: business.role }))
+    .sort((left, right) => left.id.localeCompare(right.id))
 
   if (businessesError) {
     logApiError({
@@ -62,10 +64,10 @@ export async function POST(req: NextRequest) {
       userId,
       status: 500,
       message: "Failed loading businesses",
-      error: businessesError.message,
+      error: typeof businessesError === 'string' ? businessesError : String(businessesError),
     });
     return NextResponse.json(
-      { error: "Failed to load businesses", detail: businessesError.message, reviews: null },
+      { error: "Failed to load businesses", detail: typeof businessesError === 'string' ? businessesError : String(businessesError), reviews: null },
       { status: 500 },
     );
   }
@@ -78,7 +80,7 @@ export async function POST(req: NextRequest) {
       message: "No businesses connected",
       businessCount: 0,
     });
-    return NextResponse.json({ reviews: [], businesses: [], selectedBusinessId: null });
+    return NextResponse.json({ reviews: [], businesses: [], selectedBusinessId: null, selectedBusinessRole: null });
   }
 
   const selectedBusiness = requestedBusinessId
@@ -86,6 +88,7 @@ export async function POST(req: NextRequest) {
     : businesses[0];
 
   const selectedBusinessId = selectedBusiness.id;
+  const selectedBusinessRole = selectedBusiness.role as BusinessMemberRole;
   logApiRequest({
     requestId,
     endpoint,
@@ -171,6 +174,7 @@ export async function POST(req: NextRequest) {
     reviews: reviews ?? [],
     businesses,
     selectedBusinessId,
+    selectedBusinessRole,
     historicalBacklogCount: historicalBacklogCount ?? 0,
     includeHistoricalBacklog,
   });

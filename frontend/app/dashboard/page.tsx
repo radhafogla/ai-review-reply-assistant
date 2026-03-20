@@ -5,6 +5,7 @@ import Link from "next/link"
 import { supabase } from "@/lib/supabaseClient"
 import { useSubscription } from "@/app/hooks/useSubscription"
 import { getTrialEndedUpgradeMessage, hasFeature } from "@/lib/subscription"
+import { BUSINESS_ROLES, hasAnyRole, type BusinessMemberRole } from "@/lib/businessRoles"
 
 import ReviewList from "../components/ReviewList"
 import EmptyState from "../components/EmptyState"
@@ -17,6 +18,7 @@ export default function Dashboard() {
   const [reviews, setReviews] = useState<ReviewWithAnalysis[]>([])
   const [hasBusiness, setHasBusiness] = useState(true)
   const [businesses, setBusinesses] = useState<Array<{ id: string; name: string | null }>>([])
+  const [selectedBusinessRole, setSelectedBusinessRole] = useState<BusinessMemberRole | null>(null)
   const [selectedBusinessId, setSelectedBusinessId] = useState<string>("")
   const [loading, setLoading] = useState(false)
   const [historicalBacklogCount, setHistoricalBacklogCount] = useState(0)
@@ -56,6 +58,7 @@ export default function Dashboard() {
       : 0
 
   const canBulkActions = hasFeature(subscription.plan, "bulkActions")
+  const canReplyActions = selectedBusinessRole ? hasAnyRole(selectedBusinessRole, ["responder"]) : false
 
   const ensureUserRecord = useCallback(async (accessToken: string) => {
     if (hasEnsuredUserRef.current) {
@@ -110,10 +113,14 @@ export default function Dashboard() {
     }
 
     const nextBusinesses = Array.isArray(data?.businesses) ? data.businesses : []
+    const roleFromResponse = BUSINESS_ROLES.includes(data?.selectedBusinessRole as BusinessMemberRole)
+      ? (data.selectedBusinessRole as BusinessMemberRole)
+      : null
 
     if (nextBusinesses.length === 0) {
       setHasBusiness(false)
       setBusinesses([])
+      setSelectedBusinessRole(null)
       setReviews([])
       setHistoricalBacklogCount(0)
       setHistoricalBacklogLoaded(false)
@@ -123,6 +130,7 @@ export default function Dashboard() {
 
     setHasBusiness(true)
     setBusinesses(nextBusinesses)
+    setSelectedBusinessRole(roleFromResponse)
     setHistoricalBacklogCount(Number(data?.historicalBacklogCount ?? 0))
     if (!includeHistoricalBacklog) {
       setHistoricalBacklogLoaded(false)
@@ -380,6 +388,7 @@ export default function Dashboard() {
         <ReviewList
           reviews={reviews}
           canBulkActions={canBulkActions}
+          canReplyActions={canReplyActions}
           historicalBacklogCount={historicalBacklogCount}
           historicalBacklogLoaded={historicalBacklogLoaded}
           loadingHistoricalBacklog={loadingHistoricalBacklog}

@@ -40,6 +40,9 @@ SET default_tablespace = '';
 SET default_table_access_method = "heap";
 
 
+CREATE TYPE public.business_member_role AS ENUM ('owner', 'manager', 'responder', 'viewer');
+
+
 CREATE TABLE IF NOT EXISTS "public"."businesses" (
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -220,6 +223,23 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
 ALTER TABLE "public"."users" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."business_members" (
+    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
+    "business_id" "uuid" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "role" public.business_member_role NOT NULL,
+    "status" "text" NOT NULL DEFAULT 'active'::"text" CHECK (("status" = ANY (ARRAY['active'::"text", 'suspended'::"text"]))),
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"()
+);
+
+
+ALTER TABLE "public"."business_members" OWNER TO "postgres";
+
+
+
+
+
 ALTER TABLE ONLY "public"."businesses"
     ADD CONSTRAINT "businesses_pkey" PRIMARY KEY ("id");
 
@@ -227,6 +247,19 @@ ALTER TABLE ONLY "public"."businesses"
 
 ALTER TABLE ONLY "public"."businesses"
     ADD CONSTRAINT "businesses_user_platform_unique" UNIQUE ("user_id", "external_business_id", "platform");
+
+
+
+ALTER TABLE ONLY "public"."business_members"
+    ADD CONSTRAINT "business_members_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."business_members"
+    ADD CONSTRAINT "business_members_business_user_unique" UNIQUE ("business_id", "user_id");
+
+
+
 
 
 
@@ -326,6 +359,15 @@ CREATE INDEX "idx_usage_events_user" ON "public"."usage_events" USING "btree" ("
 
 
 
+CREATE INDEX "idx_business_members_business_id" ON "public"."business_members" USING "btree" ("business_id");
+
+CREATE INDEX "idx_business_members_user_id" ON "public"."business_members" USING "btree" ("user_id");
+
+
+
+
+
+
 CREATE UNIQUE INDEX "review_ai_unique" ON "public"."review_replies" USING "btree" ("review_id", "source", "status");
 
 
@@ -366,8 +408,30 @@ CREATE OR REPLACE TRIGGER "set_updated_at_users" BEFORE UPDATE ON "public"."user
 
 
 
+CREATE OR REPLACE TRIGGER "set_updated_at_business_members" BEFORE UPDATE ON "public"."business_members" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
+
+
+
+
+
+
+
+
+
+
 ALTER TABLE ONLY "public"."businesses"
     ADD CONSTRAINT "businesses_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."business_members"
+    ADD CONSTRAINT "business_members_business_id_fkey" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."business_members"
+    ADD CONSTRAINT "business_members_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE;
+
 
 
 

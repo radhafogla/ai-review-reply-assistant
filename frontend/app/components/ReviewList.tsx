@@ -8,6 +8,7 @@ import { ReviewWithAnalysis } from "../types/review"
 type Props = {
   reviews: ReviewWithAnalysis[]
   canBulkActions?: boolean
+  canReplyActions?: boolean
   historicalBacklogCount?: number
   historicalBacklogLoaded?: boolean
   loadingHistoricalBacklog?: boolean
@@ -17,6 +18,7 @@ type Props = {
 export default function ReviewList({
   reviews,
   canBulkActions = true,
+  canReplyActions = true,
   historicalBacklogCount = 0,
   historicalBacklogLoaded = false,
   loadingHistoricalBacklog = false,
@@ -331,7 +333,7 @@ export default function ReviewList({
   }
 
   async function generateForSelected() {
-    if (!canBulkActions) return
+    if (!canBulkActions || !canReplyActions) return
     if (selectedIds.size === 0) return
 
     setBulkGenerating(true)
@@ -408,7 +410,7 @@ export default function ReviewList({
   }
 
   async function saveAndPostSelected() {
-    if (!canBulkActions) return
+    if (!canBulkActions || !canReplyActions) return
     if (selectedIds.size === 0) return
 
     setBulkPosting(true)
@@ -496,6 +498,7 @@ export default function ReviewList({
             key={review.id}
             review={review}
             mode="needs-attention"
+            canReplyActions={canReplyActions}
             showCheckbox
             isChecked={selectedIds.has(review.id)}
             isExpanded={expandedIds.has(review.id)}
@@ -529,6 +532,7 @@ export default function ReviewList({
             key={review.id}
             review={review}
             mode="posted"
+            canReplyActions={canReplyActions}
             isExpanded={expandedIds.has(review.id)}
             onToggleExpand={memoizedToggleExpand}
             onMarkedPosted={memoizedHandleMarkedPosted}
@@ -559,6 +563,7 @@ export default function ReviewList({
             key={review.id}
             review={review}
             mode="deleted"
+            canReplyActions={canReplyActions}
             isExpanded={expandedIds.has(review.id)}
             onToggleExpand={memoizedToggleExpand}
             onMarkedPosted={memoizedHandleMarkedPosted}
@@ -603,6 +608,7 @@ export default function ReviewList({
             key={review.id}
             review={review}
             mode="needs-attention"
+            canReplyActions={canReplyActions}
             isExpanded={expandedIds.has(review.id)}
             onToggleExpand={memoizedToggleExpand}
             onMarkedPosted={memoizedHandleMarkedPosted}
@@ -714,13 +720,13 @@ export default function ReviewList({
                 <button
                   type="button"
                   onClick={generateForSelected}
-                  disabled={!canBulkActions || selectedIds.size === 0 || bulkGenerating}
+                  disabled={!canBulkActions || !canReplyActions || selectedIds.size === 0 || bulkGenerating}
                   style={{
                     padding: "7px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
-                    cursor: !canBulkActions || selectedIds.size === 0 || bulkGenerating ? "not-allowed" : "pointer",
-                    backgroundColor: !canBulkActions || selectedIds.size === 0 || bulkGenerating ? "#e2e8f0" : "#2563eb",
-                    border: `1px solid ${!canBulkActions || selectedIds.size === 0 || bulkGenerating ? "#cbd5e1" : "#1d4ed8"}`,
-                    color: !canBulkActions || selectedIds.size === 0 || bulkGenerating ? "#94a3b8" : "#ffffff",
+                    cursor: !canBulkActions || !canReplyActions || selectedIds.size === 0 || bulkGenerating ? "not-allowed" : "pointer",
+                    backgroundColor: !canBulkActions || !canReplyActions || selectedIds.size === 0 || bulkGenerating ? "#e2e8f0" : "#2563eb",
+                    border: `1px solid ${!canBulkActions || !canReplyActions || selectedIds.size === 0 || bulkGenerating ? "#cbd5e1" : "#1d4ed8"}`,
+                    color: !canBulkActions || !canReplyActions || selectedIds.size === 0 || bulkGenerating ? "#94a3b8" : "#ffffff",
                     whiteSpace: "nowrap",
                   }}
                 >
@@ -729,13 +735,13 @@ export default function ReviewList({
                 <button
                   type="button"
                   onClick={saveAndPostSelected}
-                  disabled={!canBulkActions || selectedIds.size === 0 || bulkPosting}
+                  disabled={!canBulkActions || !canReplyActions || selectedIds.size === 0 || bulkPosting}
                   style={{
                     padding: "7px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
-                    cursor: !canBulkActions || selectedIds.size === 0 || bulkPosting ? "not-allowed" : "pointer",
-                    backgroundColor: !canBulkActions || selectedIds.size === 0 || bulkPosting ? "#e2e8f0" : "#059669",
-                    border: `1px solid ${!canBulkActions || selectedIds.size === 0 || bulkPosting ? "#cbd5e1" : "#047857"}`,
-                    color: !canBulkActions || selectedIds.size === 0 || bulkPosting ? "#94a3b8" : "#ffffff",
+                    cursor: !canBulkActions || !canReplyActions || selectedIds.size === 0 || bulkPosting ? "not-allowed" : "pointer",
+                    backgroundColor: !canBulkActions || !canReplyActions || selectedIds.size === 0 || bulkPosting ? "#e2e8f0" : "#059669",
+                    border: `1px solid ${!canBulkActions || !canReplyActions || selectedIds.size === 0 || bulkPosting ? "#cbd5e1" : "#047857"}`,
+                    color: !canBulkActions || !canReplyActions || selectedIds.size === 0 || bulkPosting ? "#94a3b8" : "#ffffff",
                     whiteSpace: "nowrap",
                   }}
                 >

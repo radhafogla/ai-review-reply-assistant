@@ -9,6 +9,7 @@ import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
 import { trackUsageEvent } from "@/lib/usageTracking"
 import { PREMIUM_AUTO_REPLY_DEFAULT_MIN_RATING, hasFeature, normalizePlan } from "@/lib/subscription"
 import { getReplyTonePromptGuidance, normalizeReplyTone, resolveAdaptiveReplyTone, type ReplyTone } from "@/lib/replyTone"
+import { assertBusinessRole, listAccessibleBusinesses } from "@/lib/businessAccess"
 
 interface StoredReview {
   review_id: string
@@ -311,10 +312,37 @@ export async function POST(req: NextRequest) {
   const userId = user.id
   logApiRequest({ requestId, endpoint, userId })
 
+  const body = await req.json().catch(() => ({}))
+  const requestedBusinessId = typeof body?.businessId === "string" && body.businessId.trim().length > 0
+    ? body.businessId.trim()
+    : null
+
+  const { businesses: accessibleBusinesses, error: accessibleBusinessesError } = await listAccessibleBusinesses(userId, supabase)
+
+  if (accessibleBusinessesError) {
+    logApiError({ requestId, endpoint, userId, status: 500, message: "Failed to load accessible businesses", error: accessibleBusinessesError })
+    return NextResponse.json({ error: "Failed to load businesses" }, { status: 500 })
+  }
+
+  const googleBusinesses = accessibleBusinesses.filter((business) => business.platform === "google")
+  if (googleBusinesses.length === 0) {
+    return NextResponse.json(
+      { error: "No google business connected" },
+      { status: 400 }
+    )
+  }
+
+  const selectedBusinessId = requestedBusinessId ?? googleBusinesses[0].id
+  const access = await assertBusinessRole(userId, selectedBusinessId, supabase, "manager")
+  if (access.error) {
+    logApiError({ requestId, endpoint, userId, businessId: selectedBusinessId, status: 403, message: "Insufficient business role for sync-reviews", error: access.error })
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+
   const { data: business, error: businessError } = await supabase
     .from("businesses")
     .select("id, account_id, external_business_id, name, reply_tone, platform")
-    .eq("user_id", userId)
+    .eq("id", selectedBusinessId)
     .eq("platform", "google")
     .single()
 

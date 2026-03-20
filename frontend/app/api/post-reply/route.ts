@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { createServerClient, createServiceClient } from "@/lib/supabaseServerClient";
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger";
 import { trackUsageEvent } from "@/lib/usageTracking";
+import { assertBusinessRole } from "@/lib/businessAccess";
 
 export async function POST(req: NextRequest) {
   const endpoint = "/api/post-reply"
@@ -44,6 +45,12 @@ export async function POST(req: NextRequest) {
   if (error || !review || !review.businesses) {
     logApiError({ requestId, endpoint, userId: user.id, status: 404, message: "Review not found or missing business", error: error?.message ?? "not_found", reviewId })
     return NextResponse.json({ error: "Review not found" }, { status: 404 });
+  }
+
+  const access = await assertBusinessRole(user.id, review.business_id, supabase, "responder")
+  if (access.error) {
+    logApiError({ requestId, endpoint, userId: user.id, status: 403, message: "Insufficient business role for post-reply", error: access.error, reviewId, businessId: review.business_id })
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
   const business = review.businesses;

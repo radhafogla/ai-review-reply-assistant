@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { createServerClient } from "@/lib/supabaseServerClient"
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
+import { assertBusinessRole } from "@/lib/businessAccess"
 
 export async function POST(req: NextRequest) {
   const endpoint = "/api/delete-reply"
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
     .from("reviews")
     .select(`
       id,
+      business_id,
       review_id,
       latest_reply_id,
         businesses (
@@ -55,6 +57,12 @@ export async function POST(req: NextRequest) {
   if (reviewError || !review) {
     logApiError({ requestId, endpoint, userId: user.id, status: 404, message: "Review not found", error: reviewError?.message ?? "not_found", reviewId })
     return NextResponse.json({ error: "Review not found" }, { status: 404 })
+  }
+
+  const access = await assertBusinessRole(user.id, review.business_id, supabase, "responder")
+  if (access.error) {
+    logApiError({ requestId, endpoint, userId: user.id, status: 403, message: "Insufficient business role for delete-reply", error: access.error, reviewId, businessId: review.business_id })
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
   const business = Array.isArray(review.businesses) ? review.businesses[0] : review.businesses

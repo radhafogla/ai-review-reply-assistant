@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
+import { BUSINESS_ROLES, type BusinessMemberRole } from "@/lib/businessRoles"
 import {
   DEFAULT_REPLY_TONE,
   REPLY_TONE_DESCRIPTIONS,
@@ -14,10 +15,27 @@ import {
 
 type DeleteActionType = "data" | "account" | null
 type DeleteStepType = "initial" | "email" | "final"
+type SettingsTab = "account" | "team" | "danger"
+
+type TeamBusiness = {
+  id: string
+  name: string | null
+  role: BusinessMemberRole
+}
+
+type TeamMember = {
+  id: string
+  userId: string
+  email: string
+  name: string | null
+  role: BusinessMemberRole
+  status: string
+  createdAt: string | null
+}
 
 export default function SettingsPage() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<"account" | "danger">("account")
+  const [activeTab, setActiveTab] = useState<SettingsTab>("account")
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("")
   const [deleteStep, setDeleteStep] = useState<DeleteStepType>("initial")
@@ -29,6 +47,19 @@ export default function SettingsPage() {
   const [toneSaving, setToneSaving] = useState(false)
   const [toneSaveMessage, setToneSaveMessage] = useState<string | null>(null)
   const [hasConnectedBusiness, setHasConnectedBusiness] = useState(true)
+  const [teamBusinesses, setTeamBusinesses] = useState<TeamBusiness[]>([])
+  const [selectedTeamBusinessId, setSelectedTeamBusinessId] = useState("")
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [teamLoading, setTeamLoading] = useState(false)
+  const [teamSubmitting, setTeamSubmitting] = useState(false)
+  const [teamMessage, setTeamMessage] = useState<string | null>(null)
+  const [teamError, setTeamError] = useState<string | null>(null)
+  const [canManageTeam, setCanManageTeam] = useState(false)
+  const [teamCurrentUserId, setTeamCurrentUserId] = useState("")
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [inviteRole, setInviteRole] = useState<BusinessMemberRole>("viewer")
+  const [memberRoleDrafts, setMemberRoleDrafts] = useState<Record<string, BusinessMemberRole>>({})
+  const [memberActionUserId, setMemberActionUserId] = useState<string | null>(null)
 
   const getAccessToken = useCallback(async () => {
     const {
@@ -81,6 +112,203 @@ export default function SettingsPage() {
     }
   }, [getAccessToken])
 
+  const loadTeamMembers = useCallback(async (businessId?: string) => {
+    setTeamLoading(true)
+    setTeamError(null)
+
+    try {
+      const token = await getAccessToken()
+
+      if (!token) {
+        return
+      }
+
+      const query = businessId ? `?businessId=${encodeURIComponent(businessId)}` : ""
+      const res = await fetch(`/api/team-members${query}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      const data = (await res.json().catch(() => null)) as {
+        error?: string
+        businesses?: TeamBusiness[]
+        selectedBusinessId?: string | null
+        currentUserId?: string
+        canManageTeam?: boolean
+        members?: TeamMember[]
+      } | null
+
+      if (!res.ok) {
+        setTeamError(data?.error || "Failed to load team members.")
+        return
+      }
+
+      const nextBusinesses = data?.businesses ?? []
+      const nextMembers = data?.members ?? []
+      const nextSelectedBusinessId = data?.selectedBusinessId ?? ""
+
+      setTeamBusinesses(nextBusinesses)
+      setSelectedTeamBusinessId(nextSelectedBusinessId)
+      setTeamCurrentUserId(data?.currentUserId ?? "")
+      setCanManageTeam(Boolean(data?.canManageTeam))
+      setTeamMembers(nextMembers)
+      setHasConnectedBusiness(nextBusinesses.length > 0)
+      setMemberRoleDrafts(Object.fromEntries(nextMembers.map((member) => [member.userId, member.role])))
+    } catch (error) {
+      console.error("Load team members error:", error)
+      setTeamError("Failed to load team members.")
+    } finally {
+      setTeamLoading(false)
+    }
+  }, [getAccessToken])
+
+  async function addTeamMember() {
+    if (!selectedTeamBusinessId || !inviteEmail.trim()) {
+      setTeamError("Enter an email and select a business first.")
+      return
+    }
+
+    setTeamSubmitting(true)
+    setTeamError(null)
+    setTeamMessage(null)
+
+    try {
+      const token = await getAccessToken()
+
+      if (!token) {
+        setTeamError("Session expired. Please sign in again.")
+        return
+      }
+
+      const res = await fetch("/api/team-members", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          businessId: selectedTeamBusinessId,
+          email: inviteEmail.trim(),
+          role: inviteRole,
+        }),
+      })
+
+      const data = (await res.json().catch(() => null)) as { error?: string } | null
+
+      if (!res.ok) {
+        setTeamError(data?.error || "Failed to add team member.")
+        return
+      }
+
+      setInviteEmail("")
+      setInviteRole("viewer")
+      setTeamMessage("Team member added.")
+      await loadTeamMembers(selectedTeamBusinessId)
+    } catch (error) {
+      console.error("Add team member error:", error)
+      setTeamError("Failed to add team member.")
+    } finally {
+      setTeamSubmitting(false)
+    }
+  }
+
+  async function updateMemberRole(memberUserId: string) {
+    const nextRole = memberRoleDrafts[memberUserId]
+
+    if (!selectedTeamBusinessId || !nextRole) {
+      return
+    }
+
+    setMemberActionUserId(memberUserId)
+    setTeamError(null)
+    setTeamMessage(null)
+
+    try {
+      const token = await getAccessToken()
+
+      if (!token) {
+        setTeamError("Session expired. Please sign in again.")
+        return
+      }
+
+      const res = await fetch("/api/team-members", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          businessId: selectedTeamBusinessId,
+          memberUserId,
+          role: nextRole,
+        }),
+      })
+
+      const data = (await res.json().catch(() => null)) as { error?: string } | null
+
+      if (!res.ok) {
+        setTeamError(data?.error || "Failed to update role.")
+        return
+      }
+
+      setTeamMessage("Role updated.")
+      await loadTeamMembers(selectedTeamBusinessId)
+    } catch (error) {
+      console.error("Update member role error:", error)
+      setTeamError("Failed to update role.")
+    } finally {
+      setMemberActionUserId(null)
+    }
+  }
+
+  async function removeMember(memberUserId: string) {
+    if (!selectedTeamBusinessId) {
+      return
+    }
+
+    setMemberActionUserId(memberUserId)
+    setTeamError(null)
+    setTeamMessage(null)
+
+    try {
+      const token = await getAccessToken()
+
+      if (!token) {
+        setTeamError("Session expired. Please sign in again.")
+        return
+      }
+
+      const res = await fetch("/api/team-members", {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          businessId: selectedTeamBusinessId,
+          memberUserId,
+        }),
+      })
+
+      const data = (await res.json().catch(() => null)) as { error?: string } | null
+
+      if (!res.ok) {
+        setTeamError(data?.error || "Failed to remove team member.")
+        return
+      }
+
+      setTeamMessage("Team member removed.")
+      await loadTeamMembers(selectedTeamBusinessId)
+    } catch (error) {
+      console.error("Remove team member error:", error)
+      setTeamError("Failed to remove team member.")
+    } finally {
+      setMemberActionUserId(null)
+    }
+  }
+
   async function saveReplyTone() {
     setToneSaving(true)
     setToneSaveMessage(null)
@@ -130,13 +358,14 @@ export default function SettingsPage() {
         setUserEmail(data.session.user.email)
         setIsAuthenticated(true)
         await loadReplyTone()
+        await loadTeamMembers()
       } else {
         router.push("/login")
       }
     }
 
     loadSession()
-  }, [router, loadReplyTone])
+  }, [router, loadReplyTone, loadTeamMembers])
 
   const handleDeleteData = async () => {
     setIsDeleting(true)
@@ -281,6 +510,41 @@ export default function SettingsPage() {
               }}
             >
               Account Info
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab("team")
+                setDeleteStep("initial")
+                setDeleteConfirmEmail("")
+                setDeletingType(null)
+                setTeamMessage(null)
+                setTeamError(null)
+              }}
+              style={{
+                padding: "16px 0",
+                fontSize: 14,
+                fontWeight: 600,
+                borderTop: "2px solid transparent",
+                borderRight: "2px solid transparent",
+                borderLeft: "2px solid transparent",
+                borderBottom: activeTab === "team" ? "2px solid #0f766e" : "2px solid transparent",
+                color: activeTab === "team" ? "#0f766e" : "#64748b",
+                cursor: "pointer",
+                background: "none",
+                transition: "all 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                if (activeTab !== "team") {
+                  (e.target as HTMLButtonElement).style.color = "#0f172a"
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activeTab !== "team") {
+                  (e.target as HTMLButtonElement).style.color = "#64748b"
+                }
+              }}
+            >
+              Team
             </button>
             <button
               onClick={() => {
@@ -467,6 +731,300 @@ export default function SettingsPage() {
                   >
                     Contact Us
                   </Link>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "team" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                <div
+                  style={{
+                    borderRadius: 14,
+                    border: "1.5px solid #ccfbf1",
+                    backgroundColor: "#f0fdfa",
+                    padding: "18px 20px",
+                  }}
+                >
+                  <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#0f766e", margin: "0 0 10px" }}>
+                    Team access
+                  </p>
+                  <p style={{ fontSize: 13, color: "#115e59", margin: 0 }}>
+                    Team members can only be added for existing accounts right now. Ask a teammate to sign up first, then add them here by email.
+                  </p>
+                </div>
+
+                <div
+                  style={{
+                    borderRadius: 14,
+                    border: "1.5px solid #e2e8f0",
+                    backgroundColor: "#ffffff",
+                    padding: "18px 20px",
+                  }}
+                >
+                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end" }}>
+                    <label style={{ display: "grid", gap: 8, minWidth: 260, flex: "1 1 260px" }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#64748b" }}>
+                        Business
+                      </span>
+                      <select
+                        value={selectedTeamBusinessId}
+                        onChange={(e) => {
+                          const nextBusinessId = e.target.value
+                          setSelectedTeamBusinessId(nextBusinessId)
+                          void loadTeamMembers(nextBusinessId)
+                        }}
+                        disabled={teamLoading || teamBusinesses.length === 0}
+                        style={{
+                          borderRadius: 10,
+                          border: "1.5px solid #cbd5e1",
+                          backgroundColor: "#fff",
+                          color: "#0f172a",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          padding: "8px 12px",
+                          outline: "none",
+                        }}
+                      >
+                        {teamBusinesses.length === 0 ? (
+                          <option value="">No connected businesses</option>
+                        ) : (
+                          teamBusinesses.map((business) => (
+                            <option key={business.id} value={business.id}>
+                              {(business.name?.trim() || business.id)} ({business.role})
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </label>
+
+                    <div style={{ minWidth: 240, flex: "1 1 240px" }}>
+                      <p style={{ margin: 0, fontSize: 12, color: "#475569", lineHeight: 1.6 }}>
+                        {selectedTeamBusinessId
+                          ? canManageTeam
+                            ? "You can add, change, and remove members for this business."
+                            : "You can view this team, but only owners can change membership."
+                          : "Select a business to manage its team."}
+                      </p>
+                    </div>
+                  </div>
+
+                  {(teamError || teamMessage) && (
+                    <div
+                      style={{
+                        marginTop: 14,
+                        borderRadius: 10,
+                        padding: "10px 12px",
+                        backgroundColor: teamError ? "#fef2f2" : "#f0fdf4",
+                        border: teamError ? "1px solid #fecaca" : "1px solid #bbf7d0",
+                      }}
+                    >
+                      <p style={{ margin: 0, fontSize: 12, color: teamError ? "#b91c1c" : "#166534", fontWeight: 600 }}>
+                        {teamError || teamMessage}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {canManageTeam && selectedTeamBusinessId && (
+                  <div
+                    style={{
+                      borderRadius: 14,
+                      border: "1.5px solid #e2e8f0",
+                      backgroundColor: "#ffffff",
+                      padding: "18px 20px",
+                    }}
+                  >
+                    <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#64748b", margin: "0 0 10px" }}>
+                      Add member
+                    </p>
+                    <div style={{ display: "grid", gap: 12, gridTemplateColumns: "minmax(0, 1.4fr) minmax(160px, 0.7fr) auto" }}>
+                      <input
+                        type="email"
+                        placeholder="teammate@example.com"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        disabled={teamSubmitting}
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          border: "1.5px solid #cbd5e1",
+                          borderRadius: 10,
+                          fontSize: 13,
+                          outline: "none",
+                        }}
+                      />
+                      <select
+                        value={inviteRole}
+                        onChange={(e) => setInviteRole(e.target.value as BusinessMemberRole)}
+                        disabled={teamSubmitting}
+                        style={{
+                          borderRadius: 10,
+                          border: "1.5px solid #cbd5e1",
+                          backgroundColor: "#fff",
+                          color: "#0f172a",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          padding: "10px 12px",
+                          outline: "none",
+                        }}
+                      >
+                        {BUSINESS_ROLES.map((role) => (
+                          <option key={role} value={role}>
+                            {role}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={addTeamMember}
+                        disabled={teamSubmitting}
+                        style={{
+                          padding: "10px 16px",
+                          borderRadius: 10,
+                          backgroundColor: teamSubmitting ? "#99f6e4" : "#0f766e",
+                          color: "#ffffff",
+                          fontSize: 13,
+                          fontWeight: 700,
+                          border: "none",
+                          cursor: teamSubmitting ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        {teamSubmitting ? "Adding..." : "Add member"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    borderRadius: 14,
+                    border: "1.5px solid #e2e8f0",
+                    backgroundColor: "#ffffff",
+                    padding: "18px 20px",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                    <div>
+                      <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#64748b", margin: "0 0 6px" }}>
+                        Members
+                      </p>
+                      <p style={{ margin: 0, fontSize: 13, color: "#334155" }}>
+                        {teamLoading ? "Loading team..." : `${teamMembers.length} active member${teamMembers.length === 1 ? "" : "s"}`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {teamBusinesses.length === 0 ? (
+                    <p style={{ marginTop: 14, fontSize: 13, color: "#64748b" }}>
+                      Connect a business first before managing team access.
+                    </p>
+                  ) : teamMembers.length === 0 && !teamLoading ? (
+                    <p style={{ marginTop: 14, fontSize: 13, color: "#64748b" }}>
+                      No team members found for this business yet.
+                    </p>
+                  ) : (
+                    <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
+                      {teamMembers.map((member) => {
+                        const isCurrentUser = member.userId === teamCurrentUserId
+                        const pending = memberActionUserId === member.userId
+
+                        return (
+                          <div
+                            key={member.id}
+                            style={{
+                              borderRadius: 12,
+                              border: "1px solid #e2e8f0",
+                              backgroundColor: "#f8fafc",
+                              padding: "14px 16px",
+                              display: "grid",
+                              gap: 12,
+                              gridTemplateColumns: canManageTeam ? "minmax(0, 1.4fr) minmax(150px, 0.7fr) auto auto" : "minmax(0, 1fr) auto",
+                              alignItems: "center",
+                            }}
+                          >
+                            <div>
+                              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                                {member.name || member.email}
+                                {isCurrentUser ? " (you)" : ""}
+                              </p>
+                              <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b", wordBreak: "break-all" }}>
+                                {member.email}
+                              </p>
+                              {member.createdAt && (
+                                <p style={{ margin: "6px 0 0", fontSize: 11, color: "#94a3b8" }}>
+                                  Added {new Date(member.createdAt).toLocaleDateString()}
+                                </p>
+                              )}
+                            </div>
+
+                            {canManageTeam ? (
+                              <>
+                                <select
+                                  value={memberRoleDrafts[member.userId] ?? member.role}
+                                  onChange={(e) => setMemberRoleDrafts((current) => ({
+                                    ...current,
+                                    [member.userId]: e.target.value as BusinessMemberRole,
+                                  }))}
+                                  disabled={pending}
+                                  style={{
+                                    borderRadius: 10,
+                                    border: "1.5px solid #cbd5e1",
+                                    backgroundColor: "#fff",
+                                    color: "#0f172a",
+                                    fontSize: 13,
+                                    fontWeight: 600,
+                                    padding: "8px 12px",
+                                    outline: "none",
+                                  }}
+                                >
+                                  {BUSINESS_ROLES.map((role) => (
+                                    <option key={role} value={role}>
+                                      {role}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  onClick={() => updateMemberRole(member.userId)}
+                                  disabled={pending || (memberRoleDrafts[member.userId] ?? member.role) === member.role}
+                                  style={{
+                                    padding: "8px 12px",
+                                    borderRadius: 10,
+                                    backgroundColor: pending ? "#cbd5e1" : "#0f766e",
+                                    color: "#ffffff",
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    border: "none",
+                                    cursor: pending || (memberRoleDrafts[member.userId] ?? member.role) === member.role ? "not-allowed" : "pointer",
+                                  }}
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={() => removeMember(member.userId)}
+                                  disabled={pending}
+                                  style={{
+                                    padding: "8px 12px",
+                                    borderRadius: 10,
+                                    backgroundColor: "#ffffff",
+                                    color: "#b91c1c",
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    border: "1.5px solid #fecaca",
+                                    cursor: pending ? "not-allowed" : "pointer",
+                                  }}
+                                >
+                                  Remove
+                                </button>
+                              </>
+                            ) : (
+                              <div style={{ justifySelf: "start", padding: "6px 10px", borderRadius: 999, backgroundColor: "#e2e8f0", fontSize: 12, fontWeight: 700, color: "#334155", textTransform: "capitalize" }}>
+                                {member.role}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

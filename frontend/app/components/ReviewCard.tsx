@@ -10,6 +10,7 @@ const MAX_GENERATIONS_PER_REVIEW = 5
 interface Props {
   review: ReviewWithAnalysis
   mode: "needs-attention" | "posted" | "deleted"
+  canReplyActions?: boolean
   showCheckbox?: boolean
   isChecked?: boolean
   isExpanded?: boolean
@@ -40,6 +41,7 @@ const BTN_OFF    = { bg: "#e2e8f0", border: "#cbd5e1", text: "#94a3b8" }
 export default function ReviewCard({
   review,
   mode,
+  canReplyActions = true,
   showCheckbox,
   isChecked,
   isExpanded,
@@ -312,9 +314,9 @@ export default function ReviewCard({
   const expanded = isExpanded ?? true
   const isDirty = replyText !== savedText
   const remainingAttempts = Math.max(0, MAX_GENERATIONS_PER_REVIEW - currentAttempts)
-  const genOff  = generating || remainingAttempts === 0
-  const saveOff = saving || !isDirty
-  const postOff = posting || !replyText.trim()
+  const genOff  = !canReplyActions || generating || remainingAttempts === 0
+  const saveOff = !canReplyActions || saving || !isDirty
+  const postOff = !canReplyActions || posting || !replyText.trim()
   const attemptsReached = remainingAttempts === 0
 
   const cardBackground = isDeleted ? "#fff1f2" : isNA ? "#fffbeb" : "#f0fdf4"
@@ -432,6 +434,7 @@ export default function ReviewCard({
                 onChange={(e) => {
                   setReplyText(e.target.value)
                 }}
+                readOnly={!canReplyActions}
                 style={{
                   marginTop: 10, width: "100%", boxSizing: "border-box", resize: "vertical",
                   borderRadius: 10, border: `1.5px solid ${isDeleted ? "#fda4af" : "#fcd34d"}`,
@@ -546,6 +549,24 @@ export default function ReviewCard({
                     {actionMessage.text}
                   </span>
                 )}
+
+                {!canReplyActions && (
+                  <span
+                    style={{
+                      marginLeft: 4,
+                      borderRadius: 999,
+                      padding: "6px 10px",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      alignSelf: "center",
+                      backgroundColor: "#fee2e2",
+                      border: "1px solid #fca5a5",
+                      color: "#991b1b",
+                    }}
+                  >
+                    Your role can view reviews but cannot edit or post replies.
+                  </span>
+                )}
               </div>
             </>
           ) : (
@@ -564,16 +585,16 @@ export default function ReviewCard({
               }}>
                 <button
                   onClick={deletePostedReply}
-                  disabled={deleting}
+                  disabled={deleting || !canReplyActions}
                   style={{
                     padding: "8px 16px",
                     borderRadius: 8,
                     fontSize: 13,
                     fontWeight: 700,
-                    cursor: deleting ? "not-allowed" : "pointer",
-                    backgroundColor: deleting ? BTN_OFF.bg : "#dc2626",
-                    border: `1px solid ${deleting ? BTN_OFF.border : "#b91c1c"}`,
-                    color: deleting ? BTN_OFF.text : "#ffffff",
+                    cursor: deleting || !canReplyActions ? "not-allowed" : "pointer",
+                    backgroundColor: deleting || !canReplyActions ? BTN_OFF.bg : "#dc2626",
+                    border: `1px solid ${deleting || !canReplyActions ? BTN_OFF.border : "#b91c1c"}`,
+                    color: deleting || !canReplyActions ? BTN_OFF.text : "#ffffff",
                   }}
                 >
                   {deleting ? "Deleting..." : "Delete Post"}

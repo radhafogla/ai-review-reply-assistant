@@ -1,10 +1,15 @@
 # AI Review Reply Assistant - Project Summary
 
-Last updated: 2026-03-19
+Last updated: 2026-03-20
 
 ## Executive Summary
 
-AI Review Reply Assistant is a Next.js application that helps businesses manage Google reviews end-to-end: connect Google Business Profile locations, sync reviews into Supabase, generate AI-assisted replies, edit drafts, and post responses back to Google. The app now supports both email/password auth and Google OAuth, improved user provisioning reliability, smarter post-auth routing, centralized subscription gating, premium auto-reply controls, per-review AI draft limits, and manual sentiment analysis with cached premium insights.
+AI Review Reply Assistant is a Next.js application for Google Business review operations: connect locations, sync reviews, generate AI-assisted replies, edit drafts, post to Google, and analyze sentiment with premium insight layers. The product now includes team-member collaboration with DB-level roles and role-enforced dashboard/API actions.
+
+Current production readiness assessment:
+- Core product flows are implemented and role-hardened.
+- Team members backend and frontend are implemented.
+- Main remaining platform task is Inngest-based automated sync orchestration.
 
 ## Product Scope
 
@@ -14,10 +19,9 @@ AI Review Reply Assistant is a Next.js application that helps businesses manage 
 - Edit drafts before posting
 - Post replies to Google from the app
 - Track reply lifecycle states (draft, posted, failed, deleted)
-- Provide analytics and workflow filtering
-- Run manual sentiment analysis from the analytics experience
+- Run sentiment analysis from analytics
 - Apply subscription-based feature gating
-- Support single-business workflows first, with multi-business expansion on higher plans
+- Support team collaboration with role-based access (owner, manager, responder, viewer)
 - Offer premium automation controls for high-rating review replies
 - Surface premium-only themes, AI suggestions, and sentiment trend views
 - Capture structured API logs and Sentry error reporting
@@ -32,8 +36,9 @@ Frontend and API:
 Data and auth:
 - Supabase Auth for authentication
 - Supabase Postgres for application data
-- Core tables include users, subscriptions, integrations, businesses, reviews, review_replies, review_analysis, sentiment_cache, usage_events
-- schema.sql is treated as the source of truth and should stay aligned with baseline migrations
+- Core tables include users, subscriptions, integrations, businesses, business_members, reviews, review_replies, review_analysis, sentiment_cache, usage_events
+- Baseline migration is used as production bootstrap source
+- schema.sql can be regenerated from live Supabase DB dump
 
 External integrations:
 - Google Business Profile APIs
@@ -44,92 +49,75 @@ External integrations:
 ## Authentication and User Provisioning (Completed)
 
 Implemented:
-- Email/password login and signup in frontend/app/login/page.tsx
-- Google OAuth login remains available
-- Server-side signup endpoint at frontend/app/api/auth/signup/route.ts
+- Email/password login and signup
+- Google OAuth login
+- Server-side signup endpoint
+- ensure-user provisioning guard
 
 Flow:
 1. User signs up or logs in
-2. App ensures local user profile exists via frontend/app/api/ensure-user/route.ts
-3. App routes user based on business existence:
+2. App ensures local user profile exists
+3. User is routed by business existence:
    - At least one business: /dashboard
    - No business: /connect-business
-
-Reliability improvements:
-- Duplicate-email safeguards before creating auth users
-- Hardened ensure-user behavior and clearer error handling for initialization edge cases
-- Signup path designed for immediate account usability without blocking email confirmation
 
 ## Subscription System and Feature Gating (Completed)
 
 Implemented:
-- Centralized plan definitions, limits, labels, and feature flags in frontend/lib/subscription.ts
+- Centralized plan definitions and limits in frontend/lib/subscription.ts
 - Three plans: Free Trial, Basic, Premium
-- Subscription state hook in frontend/app/hooks/useSubscription.ts backed by frontend/app/api/subscription/route.ts
-- Signup flow ensures a subscription row exists for new users
+- Subscription hook and API backing
 
 Feature gating:
-- Analytics available on Basic and Premium
-- Manual sentiment analysis available on Basic and Premium
-- Bulk actions available on Basic and Premium
-- Multi-business access available on Premium
-- Premium auto-reply available only on Premium
-- Theme clustering, AI suggestions, and sentiment trend views available only on Premium
+- Analytics and manual sentiment analysis: Basic and Premium
+- Bulk actions: Basic and Premium
+- Multi-business access: Premium
+- Premium auto-reply: Premium only
+- Themes, AI suggestions, sentiment trend views: Premium only
 
-Limits and enforcement:
-- Connected-business limits are centralized in shared constants
-- Per-review AI draft generation is hard-capped at 5 attempts per review
-- Warning events are tracked in usage_events where applicable
-- Current limits:
-   - Free Trial: 1 connected business
-   - Basic: 1 connected business
-   - Premium: 3 connected businesses
+Limits:
+- Free Trial: 1 connected business
+- Basic: 1 connected business
+- Premium: 3 connected businesses
+- Per-review AI draft generations: max 5 attempts
 
-## Premium Auto-Reply (Completed)
+## Team Members and Role Access (Completed)
 
-Implemented:
-- Premium users can enable auto-reply from frontend/app/subscriptions/page.tsx
-- Settings are stored on users via premium_auto_reply_enabled and premium_auto_reply_min_rating
-- Default state is OFF, with a default minimum rating of 5 stars
-- Premium auto-reply configuration is exposed via frontend/app/api/premium-auto-reply/route.ts
+Database model:
+- business_member_role enum: owner, manager, responder, viewer
+- business_members table with unique (business_id, user_id)
+- FK to businesses and users
 
-Observed analytics support:
-- Premium analytics now report auto-reply attempted, posted, failed, and success rate metrics
-- Auto-reply metrics are segmented per selected business in the analytics view
+Team workflows:
+- Team management API implemented (list/add/update/remove)
+- Settings Team tab implemented with business-scoped member management
+- Current add-member behavior: add existing signed-up users by email
+
+Role enforcement:
+- get-reviews: membership-based access
+- post-reply: responder+
+- sync-reviews: manager+
+- generate-reply: responder+
+- save-reply: responder+
+- delete-reply: responder+
+- team-member mutations: owner only
+
+Dashboard UI behavior:
+- Selected business role is returned by get-reviews
+- Reply actions are disabled for non-responder roles
+- View-only behavior is shown for insufficient role
 
 ## Analytics and Sentiment Insights (Completed)
 
 Implemented:
-- Manual sentiment analysis action on the analytics page for Basic and Premium users
-- Cached sentiment results stored in sentiment_cache with Last Analyzed timestamp and analyzed review count
-- Staleness detection when new reviews are synced after the last analysis run
-- Basic users can view cached sentiment breakdowns after running analysis
-- Premium users additionally receive cached key themes, AI suggestions, and 30-day positive/negative trend views
-
-Behavior:
-1. User opens analytics and selects a business
-2. If cached analysis exists, the UI shows the latest cached result and whether it is stale
-3. If new reviews arrived since the previous run, the UI prompts the user to refresh analysis
-4. Clicking Analyze or Refresh computes missing review analysis, aggregates insights, caches the result, and updates the view
-
-## UX Updates (Completed)
-
-Login/signup improvements in frontend/app/login/page.tsx:
-- Reduced excessive vertical spacing
-- Iteratively tuned card width for better visual balance
-- Preserved responsive behavior for mobile and desktop
-- Added clearer spacing around primary and secondary auth actions
-- Navbar auth links now open the correct auth mode on the shared login page
-
-Forgot-password flow:
-- Login now includes a "Forgot password?" action that links to `/reset-password`
-- Reset requests use Supabase secure recovery email links
-- Recovery links land on `/reset-password` where users can set a new password
-- On successful reset, users are routed back to `/login?mode=login`
+- Manual sentiment analysis action on analytics page
+- Cached sentiment results in sentiment_cache
+- Staleness detection when new reviews arrive
+- Premium-only themes, suggestions, and trend views
 
 ## API Surface Snapshot
 
-Current route handlers under frontend/app/api: 23
+Current route handlers under frontend/app/api: 24
 
 Includes:
 - auth/signup
@@ -155,51 +143,52 @@ Includes:
 - sentiment-cache
 - subscription
 - sync-reviews
+- team-members
 
-Notes:
-- frontend/app/api/analytics/internal/route.ts is intended for internal admin usage analytics
-- frontend/app/api/analytics/route.ts is the plan-gated customer-facing analytics endpoint
+## Migration Status
 
-## What Was Recently Delivered
+Completed:
+- Team-member schema is consolidated into baseline migration:
+  - supabase/migrations/20260317_000000_baseline_schema.sql
+- Incremental migration removed:
+  - supabase/migrations/20260319_000000_add_business_members_and_sync_queue.sql
 
-- Password-based signup/login implementation
-- Google OAuth compatibility retained
-- Signup endpoint and provisioning hardening
-- Smart post-auth redirect by business count
-- Centralized subscription config and plan-based feature gating
-- Soft-limit subscription warnings and usage tracking
-- Premium auto-reply settings with default-off behavior
-- Premium analytics card for auto-reply attempted/posted/failed/success-rate metrics
-- Manual sentiment analysis with cached Last Analyzed state
-- Premium insight cache with themes, AI suggestions, and sentiment trend views
-- Per-review AI reply cap of 5 generations with inline remaining-attempt UI
-- Login card layout and spacing refinements
-- Forgot-password and reset-password flow implementation
-- README updates to reflect the current implementation state
+Note:
+- This aligns with fresh production bootstrap from baseline.
 
-## Suggested Next Milestones
+## Sync Reviews Status (Current)
 
-- Add background refresh or scheduled recompute for premium sentiment cache
-- Improve topic extraction quality and deduplicate overlapping themes
-- Refine AI suggestions with stronger business context and category-aware recommendations
-- Add callback success/failure toast states for Google connection flow
-- Harden reliability around background automation and retry/failure workflows
+Current state in repo:
+- frontend/app/api/sync-reviews/route.ts contains sync + upsert + premium auto-reply logic
+- No scheduler/orchestrator wired yet
+- Inngest orchestration not yet integrated
+
+Implication:
+- Sync logic exists, but automated orchestration is the remaining major production task.
+
+## Remaining Work Before Production
+
+Primary remaining task:
+1. Integrate Inngest for automated sync orchestration
+2. Trigger initial sync after business connect
+3. Add scheduled recurring sync execution
+4. Add retry/backoff and failure observability
+5. Update README operational notes for Inngest deployment/env vars
 
 ## Key Files To Review
 
 - README.md
-- frontend/app/login/page.tsx
-- frontend/app/reset-password/page.tsx
-- frontend/app/api/auth/signup/route.ts
-- frontend/app/api/ensure-user/route.ts
-- frontend/lib/subscription.ts
-- frontend/app/hooks/useSubscription.ts
-- frontend/app/api/subscription/route.ts
-- frontend/app/api/premium-auto-reply/route.ts
-- frontend/app/api/analyze-reviews/route.ts
-- frontend/app/dashboard/analytics/page.tsx
-- frontend/app/subscriptions/page.tsx
-- frontend/app/api/sentiment-cache/route.ts
-- frontend/app/api/connect-google-business/route.ts
-- frontend/app/api/google-callback/route.ts
-- schema.sql
+- frontend/lib/businessAccess.ts
+- frontend/lib/businessRoles.ts
+- frontend/app/api/team-members/route.ts
+- frontend/app/settings/page.tsx
+- frontend/app/api/get-reviews/route.ts
+- frontend/app/api/post-reply/route.ts
+- frontend/app/api/generate-reply/route.ts
+- frontend/app/api/save-reply/route.ts
+- frontend/app/api/delete-reply/route.ts
+- frontend/app/api/sync-reviews/route.ts
+- frontend/app/dashboard/page.tsx
+- frontend/app/components/ReviewList.tsx
+- frontend/app/components/ReviewCard.tsx
+- supabase/migrations/20260317_000000_baseline_schema.sql
