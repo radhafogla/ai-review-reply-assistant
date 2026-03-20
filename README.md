@@ -72,7 +72,7 @@ The feature gates live in [frontend/lib/subscription.ts](frontend/lib/subscripti
 
 ## API Surface
 
-The app currently exposes 19 route handlers under [frontend/app/api](frontend/app/api):
+The app currently exposes 20 route handlers under [frontend/app/api](frontend/app/api):
 
 - `analytics`
 - `analyze-review`
@@ -88,6 +88,7 @@ The app currently exposes 19 route handlers under [frontend/app/api](frontend/ap
 - `get-reviews`
 - `google-callback`
 - `google-locations`
+- `inngest` (webhook for Inngest orchestration)
 - `post-reply`
 - `save-business`
 - `save-reply`
@@ -112,7 +113,7 @@ The baseline schema is in [schema.sql](schema.sql). The main tables are:
 - `users`: application-level user profile and plan state
 - `subscriptions`: current and historical subscription records
 - `integrations`: provider tokens and token metadata
-- `businesses`: connected business locations
+- `businesses`: connected business locations (includes `sync_status`, `sync_error`, and `last_synced_at` for tracking automated syncs)
 - `reviews`: synced Google reviews
 - `review_replies`: generated, edited, posted, failed, and deleted replies
 - `review_analysis`: AI sentiment and summary results
@@ -137,6 +138,10 @@ NEXT_PUBLIC_SENTRY_DSN=
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 
+INNGEST_EVENT_KEY=
+INNGEST_SIGNING_KEY=
+INNGEST_SYNC_REVIEWS_CRON=0 */6 * * *
+
 NEXTAUTH_SECRET=
 NEXTAUTH_URL=http://localhost:3000
 ```
@@ -147,6 +152,8 @@ Notes:
 - `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` are optional and only needed if you want source map upload during builds.
 - `RESEND_API_KEY` is required for the contact form email notification flow.
 - `SUPABASE_SERVICE_ROLE_KEY` is used by privileged server-side flows.
+- `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` are obtained from your [Inngest dashboard](https://app.inngest.com) and required for background sync jobs. Set these for production deployments to Vercel.
+- `INNGEST_SYNC_REVIEWS_CRON` controls the recurring sync schedule (cron expression). If omitted, the default is `0 */6 * * *` (every 6 hours).
 
 ## Local Development
 
@@ -197,6 +204,45 @@ npm run lint
 - `save-reply` converts the reply source to `user` when the draft is edited
 - `post-reply` now persists the actual submitted text and preserves `ai` only when the text is unchanged
 - The dashboard separates reviews into `needs attention`, `posted`, and `deleted` lanes
+
+## Automated Review Sync with Inngest
+
+The app uses [Inngest](https://inngest.com) for orchestrated background sync of Google reviews and premium auto-reply generation. This replaces manual polling with event-driven and scheduled automation.
+
+### How It Works
+
+- **Initial sync on connect**: When a user connects a Google Business location via `/api/save-business`, an Inngest event `reviews/sync.requested` is queued, triggering an immediate review sync ([frontend/inngest/functions/syncReviews.ts](frontend/inngest/functions/syncReviews.ts)).
+- **Scheduled recurring sync**: Every 6 hours, a cron job queries all connected Google locations and fans out individual sync events, ensuring reviews stay current.
+- **Retry & backoff**: Each sync event retries up to 3 times with automatic backoff, and includes failure observability via structured logs and sync status tracked on the `businesses` table.
+
+### Core Implementation
+
+- **Sync function**: [frontend/lib/syncReviewsCore.ts](frontend/lib/syncReviewsCore.ts) contains the shared sync logic (review fetch, dedup, upsert, premium auto-reply, and email notifications).
+- **HTTP route wrapper**: [frontend/app/api/sync-reviews/route.ts](frontend/app/api/sync-reviews/route.ts) is now a thin auth layer that delegates to the core function.
+- **Inngest functions**: [frontend/inngest/functions/syncReviews.ts](frontend/inngest/functions/syncReviews.ts) defines the event handler and scheduled cron.
+- **Inngest serve route**: [frontend/app/api/inngest/route.ts](frontend/app/api/inngest/route.ts) exposes the Inngest webhook handler.
+
+### Local Development
+
+Inngest dev mode runs in your terminal. To test background jobs locally:
+
+```bash
+cd frontend
+npm run dev
+
+# In another terminal
+npx inngest-cli dev
+```
+
+Events sent from `/api/save-business` or manually via the dashboard will appear in the dev UI at `http://localhost:8288`.
+
+### Production Deployment (Vercel)
+
+1. **Create an Inngest account**: Visit [app.inngest.com](https://app.inngest.com), sign up, and create a workspace.
+2. **Get signing keys**: In your Inngest workspace → Settings → API Keys, copy the `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY`.
+3. **Set environment variables**: Add both keys to your Vercel production environment variables.
+4. **Connect Vercel app**: Point your Inngest integration to the deployed Vercel URL (e.g., `https://your-app.vercel.app`), which will serve the webhook at `/api/inngest`.
+5. **Verify**: After deploy, Inngest will automatically discover your functions and begin executing scheduled jobs.
 
 ## Deployment Notes
 

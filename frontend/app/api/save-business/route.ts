@@ -2,6 +2,7 @@ import { createServerClient } from "@/lib/supabaseServerClient"
 import { getConnectedBusinessLimitExceededMessage, getPlanLimits, hasFeature, normalizePlan } from "@/lib/subscription"
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
 import { trackUsageEvent } from "@/lib/usageTracking"
+import { inngest } from "@/inngest/client"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
@@ -133,6 +134,13 @@ export async function POST(req: NextRequest) {
         plan,
       },
     })
+
+    // Trigger initial review sync for Google locations (best-effort; don't fail save on queue error)
+    if (platform === "google") {
+      inngest
+        .send({ name: "reviews/sync.requested", data: { businessId: data.id, userId: user.id } })
+        .catch(() => { /* non-critical: Inngest will pick it up on next scheduled run if this fails */ })
+    }
 
     return NextResponse.json({
       success: true,
