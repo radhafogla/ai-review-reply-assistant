@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useSearchParams } from "next/navigation"
@@ -30,7 +30,7 @@ function getPlatformBadgeStyle(platform: string) {
   return { border: "1px solid #bbf7d0", backgroundColor: "#f0fdf4", color: "#166534" }
 }
 
-export default function ConnectBusiness() {
+function ConnectBusinessContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { loading: subscriptionLoading, subscription } = useSubscription()
@@ -474,5 +474,25 @@ export default function ConnectBusiness() {
         )}
       </div>
     </div>
+  )
+}
+
+function ConnectBusinessFallback() {
+  return (
+    <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc" }}>
+      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "32px 24px 40px" }}>
+        <section style={{ borderRadius: 20, border: "1px solid #e2e8f0", backgroundColor: "#fff", padding: 24 }}>
+          <p style={{ margin: 0, color: "#64748b", fontSize: 14 }}>Loading connect business...</p>
+        </section>
+      </div>
+    </div>
+  )
+}
+
+export default function ConnectBusiness() {
+  return (
+    <Suspense fallback={<ConnectBusinessFallback />}>
+      <ConnectBusinessContent />
+    </Suspense>
   )
 }
