@@ -58,6 +58,11 @@ export function logApiError(
       : new Error(normalizedError)
 
   Sentry.captureException(sentryError, {
+    tags: {
+      area: "api",
+      endpoint: String(payload.endpoint),
+      status: payload.status != null ? String(payload.status) : "unknown",
+    },
     extra: {
       requestId: payload.requestId,
       endpoint: payload.endpoint,

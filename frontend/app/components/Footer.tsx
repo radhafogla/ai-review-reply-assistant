@@ -10,6 +10,7 @@ const Footer = () => {
         <div className="flex items-center gap-4">
           <Link
             href="/contact"
+            prefetch={false}
             className="font-medium transition"
             style={{ color: 'var(--primary-700)' }}
             onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--primary-800)')}
@@ -19,6 +20,7 @@ const Footer = () => {
           </Link>
           <Link
             href="/privacy-policy"
+            prefetch={false}
             className="font-medium transition"
             style={{ color: 'var(--primary-700)' }}
             onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--primary-800)')}

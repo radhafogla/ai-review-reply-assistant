@@ -116,15 +116,30 @@ export async function POST(req: NextRequest) {
   const toneInstruction = getReplyTonePromptGuidance(effectiveTone);
 
   const prompt = `
-You are replying to a Google review as a business owner.
+You are replying to a review as a business owner.
 
 Rating: ${rating} stars
 Review: "${review_text}"
-${toneInstruction}
+Use Tone: ${toneInstruction}
 
-Write a professional and friendly reply under 80 words. You dont need to address/greet the user or add regards at the end. Just the message itself is good.
-Make it sound human and conversational, not robotic or overly formal. Use natural everyday wording, avoid generic corporate phrases, and acknowledge one concrete detail from the review when possible.
-`;
+Avoid friendly filler phrases like:
+"hey there"
+"thanks for your honest take"
+"hope you find..."
+"we appreciate you pointing this out"
+
+Do not over-apologize or sound overly polite.
+
+Keep the tone slightly direct and grounded, like a real business owner writing quickly.
+
+Avoid explaining intentions like "we want to do better" or "we aim to improve".
+
+Focus on:
+- Acknowledging the issue
+- Reacting to it naturally
+- Keeping it concise and real
+Keep sentences slightly varied in length and avoid overly polished wording.
+It's okay if the reply feels a bit imperfect as long as it feels real.`
 
   try {
     const completion = await openai.chat.completions.create({

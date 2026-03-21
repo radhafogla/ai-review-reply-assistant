@@ -1,6 +1,6 @@
-export const DEFAULT_REPLY_TONE = "professional" as const
+export const DEFAULT_REPLY_TONE = "casual" as const
 
-export const REPLY_TONE_VALUES = ["professional", "friendly", "apologetic"] as const
+export const REPLY_TONE_VALUES = ["professional", "friendly", "casual", "apologetic"] as const
 
 export type ReplyTone = (typeof REPLY_TONE_VALUES)[number]
 export type ReviewSentiment = "positive" | "neutral" | "negative"
@@ -8,18 +8,21 @@ export type ReviewSentiment = "positive" | "neutral" | "negative"
 export const REPLY_TONE_LABELS: Record<ReplyTone, string> = {
   professional: "Professional",
   friendly: "Friendly",
+  casual: "Casual",
   apologetic: "Apologetic",
 }
 
 export const REPLY_TONE_DESCRIPTIONS: Record<ReplyTone, string> = {
   professional: "Balanced and courteous with a polished business tone.",
   friendly: "Warm and conversational while staying respectful.",
+  casual: "Relaxed and informal, like chatting with a regular customer.",
   apologetic: "Empathetic, ownership-driven wording for service recovery.",
 }
 
 const REPLY_TONE_PROMPT_GUIDANCE: Record<ReplyTone, string> = {
   professional: "Tone preference: professional and courteous.",
   friendly: "Tone preference: warm, friendly, and conversational.",
+  casual: "Tone preference: casual and relaxed, informal and laid-back without being unprofessional.",
   apologetic: "Tone preference: empathetic and apologetic while remaining constructive.",
 }
 

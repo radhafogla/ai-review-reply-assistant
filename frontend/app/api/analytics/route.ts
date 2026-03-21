@@ -149,26 +149,39 @@ export async function POST(req: NextRequest) {
 
   // Fetch unfiltered all-time counts so the stat cards always show totals, not range-scoped numbers.
   // These are only needed when a date range is applied (Premium); Basic users get full data anyway.
-  const [totalReviewsAllTime, totalRepliesAllTime] = appliedRange
+  const businessReviewIds = appliedRange
+    ? await supabase
+        .from("reviews")
+        .select("id")
+        .eq("business_id", selectedBusinessId)
+        .then(({ data }) => (data ?? []).map((r) => r.id))
+    : []
+
+  const [totalReviewsAllTime, postedRepliesAllTime, pendingRepliesAllTime] = appliedRange
     ? await Promise.all([
         supabase
           .from("reviews")
           .select("id", { count: "exact", head: true })
           .eq("business_id", selectedBusinessId)
           .then(({ count }) => count ?? 0),
-        supabase
-          .from("review_replies")
-          .select("id", { count: "exact", head: true })
-          .in("review_id",
-            await supabase
-              .from("reviews")
-              .select("id")
-              .eq("business_id", selectedBusinessId)
-              .then(({ data }) => (data ?? []).map((r) => r.id))
-          )
-          .then(({ count }) => count ?? 0),
+        businessReviewIds.length
+          ? supabase
+              .from("review_replies")
+              .select("id", { count: "exact", head: true })
+              .in("review_id", businessReviewIds)
+              .eq("status", "posted")
+              .then(({ count }) => count ?? 0)
+          : Promise.resolve(0),
+        businessReviewIds.length
+          ? supabase
+              .from("review_replies")
+              .select("id", { count: "exact", head: true })
+              .in("review_id", businessReviewIds)
+              .in("status", ["draft", "approved"])
+              .then(({ count }) => count ?? 0)
+          : Promise.resolve(0),
       ])
-    : [null, null]
+    : [null, null, null]
 
   if (appliedRange) {
     reviewsQuery = reviewsQuery
@@ -268,6 +281,9 @@ export async function POST(req: NextRequest) {
     else if (latest.status in statusCount) statusCount[latest.status as keyof typeof statusCount] += 1
   }
 
+  const postedReplies = postedRepliesAllTime ?? statusCount.posted
+  const pendingReplies = pendingRepliesAllTime ?? (statusCount.draft + statusCount.approved)
+
   const sourceCount = { ai: 0, user: 0, system: 0 }
   for (const reply of replies ?? []) {
     if (reply.source in sourceCount) {
@@ -307,7 +323,9 @@ export async function POST(req: NextRequest) {
     totals: {
       reviews: totalReviewsAllTime ?? reviews?.length ?? 0,
       totalReviewsAllTime: totalReviewsAllTime ?? reviews?.length ?? 0,
-      replies: totalRepliesAllTime ?? replies?.length ?? 0,
+      replies: postedReplies + pendingReplies,
+      postedReplies,
+      pendingReplies,
       avgRating,
       negativeAlertsSent,
       negativeAlertsFailed,

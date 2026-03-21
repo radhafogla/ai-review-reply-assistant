@@ -45,11 +45,26 @@ function formatReviewDate(value?: string) {
   return parsed.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })
 }
 
-function trimReviewPreview(text?: string, maxLength = 130) {
-  const normalized = String(text ?? "").trim()
-  if (!normalized) return "No written review"
-  if (normalized.length <= maxLength) return normalized
-  return `${normalized.slice(0, maxLength).trimEnd()}...`
+function resolveSentimentMeta(review: ReviewWithAnalysis) {
+  const firstAnalysis = review.review_analysis?.[0]
+  const analysisSentiment = typeof firstAnalysis?.sentiment === "string"
+    ? firstAnalysis.sentiment.toLowerCase()
+    : ""
+
+  const rating = Number(review.rating)
+  const sentiment = analysisSentiment === "positive" || analysisSentiment === "neutral" || analysisSentiment === "negative"
+    ? analysisSentiment
+    : (rating >= 4 ? "positive" : rating <= 2 ? "negative" : "neutral")
+
+  if (sentiment === "positive") {
+    return { emoji: "😊", label: "Positive", bg: "#dcfce7", border: "#86efac", color: "#166534" }
+  }
+
+  if (sentiment === "negative") {
+    return { emoji: "☹️", label: "Negative", bg: "#fee2e2", border: "#fecaca", color: "#991b1b" }
+  }
+
+  return { emoji: "😐", label: "Neutral", bg: "#fef9c3", border: "#fde68a", color: "#854d0e" }
 }
 
 export default function ReviewCard({
@@ -341,6 +356,7 @@ export default function ReviewCard({
   const badgeColor = isDeleted ? "#9f1239" : isNA ? "#78350f" : "#14532d"
   const chevronColor = isDeleted ? "#e11d48" : isNA ? "#b45309" : "#059669"
   const statusLabel = isDeleted ? "Deleted" : isNA ? "Needs attention" : "Posted"
+  const sentimentMeta = resolveSentimentMeta(review)
 
   const persistedTone =
     review.latest_reply?.tone_base && review.latest_reply?.tone_effective
@@ -387,12 +403,33 @@ export default function ReviewCard({
           style={{ flex: 1, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, minWidth: 0 }}
         >
           <div style={{ minWidth: 0, flexShrink: 0 }}>
-            <p style={{ fontWeight: 600, color: "#0f172a", margin: 0 }}>{review.author_name}</p>
+            <p style={{ fontWeight: 600, color: "#0f172a", margin: 0, minWidth: 0 }}>{review.author_name}</p>
             <p style={{ fontSize: 12, color: "#94a3b8", margin: "1px 0 0" }}>Customer review</p>
-            <p style={{ fontSize: 12, margin: "2px 0 0", color: "#f59e0b" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 2 }}>
+              <p style={{ fontSize: 14, margin: 0, color: "#b45309", fontWeight: 800, letterSpacing: "0.02em" }}>
               {"★".repeat(Math.min(5, Number(review.rating) || 0))}
               {"☆".repeat(Math.max(0, 5 - (Number(review.rating) || 0)))}
-            </p>
+              </p>
+              <span
+                title={`Sentiment: ${sentimentMeta.label}`}
+                aria-label={`Sentiment: ${sentimentMeta.label}`}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 26,
+                  height: 26,
+                  borderRadius: 999,
+                  border: `1.5px solid ${sentimentMeta.border}`,
+                  backgroundColor: sentimentMeta.bg,
+                  color: sentimentMeta.color,
+                  fontSize: 16,
+                  flexShrink: 0,
+                }}
+              >
+                {sentimentMeta.emoji}
+              </span>
+            </div>
           </div>
 
           <div style={{ minWidth: 0, flex: 1, borderLeft: "1px solid #cbd5e1", paddingLeft: 12 }}>
@@ -402,13 +439,12 @@ export default function ReviewCard({
                 fontSize: 14,
                 fontWeight: 600,
                 color: "#334155",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
+                whiteSpace: "normal",
+                overflowWrap: "anywhere",
               }}
-              title={trimReviewPreview(review.review_text, 400)}
+              title={review.review_text || ""}
             >
-              &ldquo;{trimReviewPreview(review.review_text, 160)}&rdquo;
+              &ldquo;{(review.review_text ?? "").trim() || "No review text"}&rdquo;
             </p>
             <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b", fontWeight: 600 }}>
               {formatReviewDate(review.review_time || review.created_at)}

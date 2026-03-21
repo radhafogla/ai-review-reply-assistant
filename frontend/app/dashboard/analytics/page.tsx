@@ -14,6 +14,7 @@ type AnalyticsPayload = {
     reviews: number
     totalReviewsAllTime: number
     replies: number
+    postedReplies: number
     avgRating: number
     negativeAlertsSent: number
     negativeAlertsFailed: number
@@ -569,7 +570,7 @@ export default function AnalyticsPage() {
               Review insights
             </h1>
             <p style={{ fontSize: 14, color: "#475569", marginTop: 6, maxWidth: 620 }}>
-              Snapshot of your review activity: total reviews, replies, average rating, and subscription status.
+              Snapshot of your review activity: total reviews, posted replies, average rating, and subscription status.
             </p>
           </div>
 
@@ -657,8 +658,8 @@ export default function AnalyticsPage() {
                 <div style={{ fontSize: 26, fontWeight: 800, color: "#0f172a", marginTop: 8 }}>{totals?.reviews ?? 0}</div>
               </div>
               <div style={{ borderRadius: 14, backgroundColor: "#f0fdf4", border: "1.5px solid #bbf7d0", padding: "14px 18px" }}>
-                <div style={{ fontSize: 14, color: "#065f46", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Replies</div>
-                <div style={{ fontSize: 26, fontWeight: 800, color: "#14532d", marginTop: 8 }}>{totals?.replies ?? 0}</div>
+                <div style={{ fontSize: 14, color: "#065f46", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Posted replies</div>
+                <div style={{ fontSize: 26, fontWeight: 800, color: "#14532d", marginTop: 8 }}>{totals?.postedReplies ?? 0}</div>
               </div>
               <div style={{ borderRadius: 14, backgroundColor: "#fdf4ff", border: "1.5px solid #e9d5ff", padding: "14px 18px" }}>
                 <div style={{ fontSize: 14, color: "#7e22ce", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Avg. rating</div>

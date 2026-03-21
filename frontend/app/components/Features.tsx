@@ -34,8 +34,8 @@ export default function Features() {
       status: "Live now",
     },
     {
-      title: "Sentiment Radar",
-      desc: "Run manual analysis across synced reviews and cache a fresh sentiment breakdown.",
+      title: "Negative Review Alerts",
+      desc: "Get email alerts for new low-star reviews so your team can respond fast.",
       status: "Live now",
     },
     {
@@ -44,8 +44,8 @@ export default function Features() {
       status: "Live now",
     },
     {
-      title: "Negative Review Alerts",
-      desc: "Get email alerts for new low-star reviews so your team can respond fast.",
+      title: "Sentiment Radar",
+      desc: "Run manual analysis across synced reviews and cache a fresh sentiment breakdown.",
       status: "Live now",
     },
     {
