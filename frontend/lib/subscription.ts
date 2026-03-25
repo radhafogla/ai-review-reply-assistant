@@ -36,8 +36,8 @@ export const PLAN_DESCRIPTIONS: Record<SubscriptionPlan, string> = {
 
 export const PLAN_PRICING: Record<SubscriptionPlan, string> = {
   free: "$0 for 14 days",
-  basic: "$19 / month",
-  premium: "$49 / month",
+  basic: "$39 / month",
+  premium: "$89 / month",
 }
 
 export const PLAN_FEATURE_ORDER: SubscriptionFeature[] = [
@@ -116,6 +116,11 @@ export const PLAN_USAGE_LABELS: Record<PlanLimitKey, string> = {
 }
 
 export function normalizePlan(value: unknown): SubscriptionPlan {
+  // "trial" is accepted as an alias for legacy/cross-system compatibility.
+  if (value === "trial") {
+    return "free"
+  }
+
   if (value === "basic" || value === "premium" || value === "free") {
     return value
   }
@@ -225,7 +230,7 @@ export function getFeatureGateApiMessage(feature: SubscriptionFeature) {
 
 export function getFeatureGateTitle(feature: SubscriptionFeature) {
   if (feature === "analytics") {
-    return "Analytics is not available on Free"
+    return "Analytics is not available on Trial"
   }
 
   if (feature === "advancedAnalytics") {
@@ -256,5 +261,5 @@ export function getFeatureGateUpgradeHint(feature: SubscriptionFeature) {
 }
 
 export function getTrialEndedUpgradeMessage() {
-  return "Your Free Trial has ended. Choose Basic or Premium to continue advanced features."
+  return "Your Free Trial has ended. Choose Basic or Premium to continue using Revidew."
 }

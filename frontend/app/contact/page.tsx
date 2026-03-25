@@ -410,7 +410,7 @@ export default function ContactPage() {
                   Email us directly
                 </p>
                 <a
-                  href="mailto:support@reviewai.com"
+                  href="mailto:support@revidew.com"
                   style={{
                     fontSize: 14,
                     fontWeight: 600,
@@ -418,7 +418,7 @@ export default function ContactPage() {
                     textDecoration: "none",
                   }}
                 >
-                  support@reviewai.com
+                  support@revidew.com
                 </a>
                 <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 8 }}>
                   We typically respond within 1 business day.

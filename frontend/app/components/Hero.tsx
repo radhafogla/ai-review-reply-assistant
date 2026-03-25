@@ -60,7 +60,7 @@ export default function Hero() {
                   e.currentTarget.style.color = 'var(--neutral-700)';
                 }}
               >
-                See what Revora does
+                See what Revidew does
               </Link>
             </div>
 

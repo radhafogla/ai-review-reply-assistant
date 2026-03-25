@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server"
 import { createServerClient } from "@/lib/supabaseServerClient"
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
 import { PREMIUM_AUTO_REPLY_DEFAULT_MIN_RATING, getFeatureGateApiMessage, hasFeature, normalizePlan } from "@/lib/subscription"
+import { requireTrialOrPaidAccess } from "@/lib/subscriptionAccess"
 
 async function getAuthedUser(req: NextRequest) {
   const authHeader = req.headers.get("Authorization") || ""
@@ -36,6 +37,11 @@ export async function GET(req: NextRequest) {
   }
 
   const { user, supabase } = auth
+  const accessCheck = await requireTrialOrPaidAccess(user.id, supabase)
+  if (accessCheck.response) {
+    return accessCheck.response
+  }
+
   logApiRequest({ requestId, endpoint, userId: user.id })
 
   const { data: userRow, error } = await supabase
@@ -69,6 +75,11 @@ export async function POST(req: NextRequest) {
   }
 
   const { user, supabase } = auth
+  const accessCheck = await requireTrialOrPaidAccess(user.id, supabase)
+  if (accessCheck.response) {
+    return accessCheck.response
+  }
+
   const body = await req.json().catch(() => ({}))
   const enabled = body?.enabled === true
   const minRating = Math.min(5, Math.max(1, Number(body?.minRating ?? PREMIUM_AUTO_REPLY_DEFAULT_MIN_RATING)))

@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabaseServerClient"
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
 import { assertBusinessRole, listAccessibleBusinesses } from "@/lib/businessAccess"
 import { performBusinessSync } from "@/lib/syncReviewsCore"
+import { requireTrialOrPaidAccess } from "@/lib/subscriptionAccess"
 
 export async function POST(req: NextRequest) {
   const endpoint = "/api/sync-reviews"
@@ -20,6 +21,11 @@ export async function POST(req: NextRequest) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const accessCheck = await requireTrialOrPaidAccess(user.id, supabase)
+  if (accessCheck.response) {
+    return accessCheck.response
   }
 
   const userId = user.id

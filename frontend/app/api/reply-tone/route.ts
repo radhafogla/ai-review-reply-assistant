@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server"
 import { createServerClient } from "@/lib/supabaseServerClient"
 import { createRequestId, logApiError } from "@/lib/apiLogger"
 import { normalizeReplyTone, REPLY_TONE_VALUES, type ReplyTone } from "@/lib/replyTone"
+import { requireTrialOrPaidAccess } from "@/lib/subscriptionAccess"
 
 async function getCurrentBusiness(userId: string, supabase: Awaited<ReturnType<typeof createServerClient>>) {
   const { data: business, error } = await supabase
@@ -41,6 +42,11 @@ export async function GET(req: NextRequest) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const accessCheck = await requireTrialOrPaidAccess(user.id, supabase)
+  if (accessCheck.response) {
+    return accessCheck.response
   }
 
   const { business, error } = await getCurrentBusiness(user.id, supabase)
@@ -97,6 +103,11 @@ export async function POST(req: NextRequest) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const accessCheck = await requireTrialOrPaidAccess(user.id, supabase)
+  if (accessCheck.response) {
+    return accessCheck.response
   }
 
   const { business, error } = await getCurrentBusiness(user.id, supabase)

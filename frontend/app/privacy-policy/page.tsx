@@ -92,7 +92,7 @@ const PrivacyPolicyPage = () => {
         <section className="mt-8 space-y-3">
           <h2 className="text-xl font-semibold text-slate-900">9. Contact Us</h2>
           <p className="leading-7 text-slate-700">
-            For privacy-related questions, contact us at privacy@reviewai.com.
+            For privacy-related questions, contact us at privacy@revidew.com.
           </p>
           <p className="text-sm text-slate-600">
             For product support, billing, or technical help, use our {" "}

@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server"
 import { createServerClient } from "@/lib/supabaseServerClient"
 import { createRequestId, logApiRequest } from "@/lib/apiLogger"
 import { createGoogleOAuthState } from "@/lib/googleOAuthState"
+import { requireTrialOrPaidAccess } from "@/lib/subscriptionAccess"
 
 function getAppBaseUrl(req: NextRequest) {
   return process.env.LOCALAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || req.nextUrl.origin
@@ -25,6 +26,11 @@ export async function POST(req: NextRequest) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const accessCheck = await requireTrialOrPaidAccess(user.id, supabase)
+  if (accessCheck.response) {
+    return accessCheck.response
   }
 
   logApiRequest({ requestId, endpoint, userId: user.id })

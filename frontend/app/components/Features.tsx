@@ -24,7 +24,7 @@ const VISUALS = [
 export default function Features() {
   const features = [
     {
-      title: "Revora Inbox",
+      title: "Revidew Inbox",
       desc: "All incoming reviews in one clean queue.",
       status: "Live now",
     },
@@ -40,17 +40,17 @@ export default function Features() {
     },
     {
       title: "Brand Voice Templates",
-      desc: "Set reply tone to Professional, Friendly, or Apologetic and keep responses consistent.",
+      desc: "Set reply tone to Professional, Friendly, Casual, or Apologetic and keep responses consistent.",
       status: "Live now",
     },
     {
-      title: "Sentiment Radar",
-      desc: "Run manual analysis across synced reviews and cache a fresh sentiment breakdown.",
+      title: "Team Collaboration",
+      desc: "Invite owners, managers, responders, and viewers so each business can work with the right access level.",
       status: "Live now",
     },
     {
-      title: "Action Coach",
-      desc: "Premium analytics turn recurring review themes into AI suggestions and trend views.",
+      title: "Sentiment Radar and Action Coach",
+      desc: "Run manual analysis across synced reviews and turn recurring review themes into AI suggestions and trend views.",
       status: "Live now",
     },
   ]
@@ -79,7 +79,7 @@ export default function Features() {
   const workflowSteps = [
     {
       title: "Connect",
-      desc: "Link your Google Business profile and sync reviews into a single command center.",
+      desc: "Link your Google Business profile and keep reviews flowing into one command center with manual and scheduled sync coverage.",
     },
     {
       title: "Respond",
@@ -223,25 +223,10 @@ export default function Features() {
                   e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
                 }}
               >
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wide" style={{ borderColor: 'var(--neutral-200)', backgroundColor: 'var(--neutral-50)', color: 'var(--neutral-500)' }}>
-                    Module
-                  </span>
-                  <span
-                    className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold"
-                    style={{
-                      borderColor: f.status === "Live now" ? 'var(--success-200)' : 'var(--warning-200)',
-                      backgroundColor: f.status === "Live now" ? 'var(--success-50)' : 'var(--warning-50)',
-                      color: f.status === "Live now" ? 'var(--success-700)' : 'var(--warning-700)'
-                    }}
-                  >
-                    {f.status}
-                  </span>
-                </div>
 
                 <h4 className="mb-1 text-base font-bold" style={{ color: 'var(--neutral-900)' }}>{f.title}</h4>
 
-                <p className="text-sm leading-5" style={{ color: 'var(--neutral-600)' }}>{f.desc}</p>
+                <p className="text-base leading-6" style={{ color: 'var(--neutral-600)' }}>{f.desc}</p>
               </div>
             ))}
           </div>
@@ -251,7 +236,7 @@ export default function Features() {
         <div className="mb-16 rounded-3xl p-6 shadow-md md:p-10" style={{ borderColor: 'var(--neutral-200)', borderWidth: '1px', backgroundImage: `linear-gradient(to bottom right, var(--neutral-50), color-mix(in srgb, var(--neutral-100) 50%, transparent))` }}>
           <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--primary-600)' }}>The Revora workflow</p>
+              <p className="text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--primary-600)' }}>The Revidew workflow</p>
               <h3 className="mt-2 text-2xl font-black tracking-tight md:text-3xl" style={{ color: 'var(--neutral-900)' }}>
                 Four repeatable steps to running feedback smarter
               </h3>
@@ -265,7 +250,7 @@ export default function Features() {
                   <span className="text-sm font-bold" style={{ color: 'var(--primary-600)' }}>{index + 1}</span>
                 </div>
                 <h4 className="mb-2 text-base font-bold" style={{ color: 'var(--neutral-900)' }}>{step.title}</h4>
-                <p className="text-sm leading-5" style={{ color: 'var(--neutral-600)' }}>{step.desc}</p>
+                <p className="text-base leading-6" style={{ color: 'var(--neutral-600)' }}>{step.desc}</p>
               </div>
             ))}
           </div>
@@ -275,7 +260,7 @@ export default function Features() {
         <div className="rounded-3xl p-8 text-center md:p-10" style={{ backgroundColor: 'var(--neutral-900)', color: 'white' }}>
           <p className="text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--primary-200)' }}>Ready to take control?</p>
           <h3 className="mx-auto mt-2 max-w-3xl text-2xl font-black tracking-tight md:text-3xl">
-            Start your free trial and see how Revora transforms your review workflow.
+            Start your free trial and see how Revidew transforms your review workflow.
           </h3>
           <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <a

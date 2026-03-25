@@ -149,6 +149,8 @@ CREATE TABLE IF NOT EXISTS "public"."reviews" (
     "last_ai_attempt_at" timestamp with time zone,
     "ai_reply_attempts" integer DEFAULT 0,
     "platform" "text" DEFAULT 'google'::"text" NOT NULL,
+    "last_confirmed_at" timestamp with time zone DEFAULT "now"(),
+    "deleted_at" timestamp with time zone,
     CONSTRAINT "reviews_platform_check" CHECK (("platform" = ANY (ARRAY['google'::"text", 'yelp'::"text", 'facebook'::"text"])))
 );
 
@@ -344,6 +346,15 @@ CREATE INDEX "idx_reviews_reply" ON "public"."reviews" USING "btree" ("latest_re
 CREATE INDEX "idx_reviews_time" ON "public"."reviews" USING "btree" ("review_time" DESC);
 
 
+
+CREATE INDEX "idx_reviews_last_confirmed_at" ON "public"."reviews" USING "btree" ("last_confirmed_at");
+
+
+
+CREATE INDEX "idx_reviews_deleted_at" ON "public"."reviews" USING "btree" ("deleted_at") WHERE "deleted_at" IS NOT NULL;
+
+
+
 CREATE INDEX "idx_sentiment_cache_business_latest" ON "public"."sentiment_cache" USING "btree" ("business_id", "analyzed_at" DESC);
 
 
@@ -387,7 +398,7 @@ CREATE OR REPLACE TRIGGER "set_updated_at_review_replies" BEFORE UPDATE ON "publ
 CREATE OR REPLACE TRIGGER "set_updated_at_reviews" BEFORE UPDATE ON "public"."reviews" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
 
 
-CREATE OR REPLACE TRIGGER "set_updated_at_sentiment_cache" BEFORE UPDATE ON "public"."sentiment_cache" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
+CREATE OR REPLACE TRIGGER "set_sentiment_cache_updated_at" BEFORE UPDATE ON "public"."sentiment_cache" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
 
 
 
@@ -613,6 +624,16 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."usage_events" TO "authentic
 
 GRANT ALL ON TABLE "public"."users" TO "service_role";
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."users" TO "authenticated";
+
+
+
+GRANT ALL ON TABLE "public"."business_members" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."business_members" TO "authenticated";
+
+
+
+GRANT ALL ON TABLE "public"."sentiment_cache" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."sentiment_cache" TO "authenticated";
 
 
 

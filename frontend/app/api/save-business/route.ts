@@ -3,6 +3,7 @@ import { getConnectedBusinessLimitExceededMessage, getPlanLimits, hasFeature, no
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
 import { trackUsageEvent } from "@/lib/usageTracking"
 import { inngest } from "@/inngest/client"
+import { requireTrialOrPaidAccess } from "@/lib/subscriptionAccess"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
@@ -50,6 +51,11 @@ export async function POST(req: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const accessCheck = await requireTrialOrPaidAccess(user.id, supabase)
+    if (accessCheck.response) {
+      return accessCheck.response
     }
 
     const body = await req.json()

@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server"
 import OpenAI from "openai"
 import { createServerClient } from "@/lib/supabaseServerClient"
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
+import { requireTrialOrPaidAccess } from "@/lib/subscriptionAccess"
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -25,6 +26,11 @@ export async function POST(req: NextRequest) {
   if (!user) {
     logApiError({ requestId, endpoint, status: 401, message: "No user in session", error: "no_user" })
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const accessCheck = await requireTrialOrPaidAccess(user.id, supabase)
+  if (accessCheck.response) {
+    return accessCheck.response
   }
 
   const { reviewId, reviewText, rating } = await req.json()

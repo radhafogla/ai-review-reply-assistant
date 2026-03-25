@@ -82,3 +82,39 @@ export function resolveAdaptiveReplyTone({
 
   return baseTone
 }
+
+export function buildReplyPrompt({
+  rating,
+  reviewText,
+  toneInstruction,
+}: {
+  rating: number | string
+  reviewText: string
+  toneInstruction: string
+}): string {
+  return `
+You are replying to a review as a business owner.
+
+Rating: ${rating} stars
+Review: "${reviewText}"
+Use Tone: ${toneInstruction}
+
+Avoid friendly filler phrases like:
+"hey there"
+"thanks for your honest take"
+"hope you find..."
+"we appreciate you pointing this out"
+
+Do not over-apologize or sound overly polite.
+
+Keep the tone slightly direct and grounded, like a real business owner writing quickly.
+
+Avoid explaining intentions like "we want to do better" or "we aim to improve".
+
+Focus on:
+- Acknowledging the issue
+- Reacting to it naturally
+- Keeping it concise and real
+Keep sentences slightly varied in length and avoid overly polished wording.
+It's okay if the reply feels a bit imperfect as long as it feels real.`
+}

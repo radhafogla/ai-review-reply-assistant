@@ -35,6 +35,8 @@ type TeamMember = {
 
 export default function SettingsPage() {
   const router = useRouter()
+  const sentryEnvironment = process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT?.toLowerCase() || "development"
+  const showTestEmailControls = sentryEnvironment !== "production"
   const [activeTab, setActiveTab] = useState<SettingsTab>("account")
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("")
@@ -46,6 +48,10 @@ export default function SettingsPage() {
   const [toneLoading, setToneLoading] = useState(false)
   const [toneSaving, setToneSaving] = useState(false)
   const [toneSaveMessage, setToneSaveMessage] = useState<string | null>(null)
+  const [testEmailSending, setTestEmailSending] = useState(false)
+  const [testEmailMessage, setTestEmailMessage] = useState<string | null>(null)
+  const [exportLoading, setExportLoading] = useState(false)
+  const [exportMessage, setExportMessage] = useState<string | null>(null)
   const [hasConnectedBusiness, setHasConnectedBusiness] = useState(true)
   const [teamBusinesses, setTeamBusinesses] = useState<TeamBusiness[]>([])
   const [selectedTeamBusinessId, setSelectedTeamBusinessId] = useState("")
@@ -348,6 +354,90 @@ export default function SettingsPage() {
       setToneSaveMessage("Could not save brand voice. Please try again.")
     } finally {
       setToneSaving(false)
+    }
+  }
+
+  async function sendTestNegativeReviewEmail() {
+    setTestEmailSending(true)
+    setTestEmailMessage(null)
+
+    try {
+      const token = await getAccessToken()
+
+      if (!token) {
+        setTestEmailMessage("Session expired. Please sign in again.")
+        return
+      }
+
+      const res = await fetch("/api/test-negative-review-email", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}),
+      })
+
+      const data = (await res.json().catch(() => null)) as {
+        error?: string
+        detail?: string | null
+        sentTo?: string
+      } | null
+
+      if (!res.ok) {
+        setTestEmailMessage(data?.detail || data?.error || "Failed to send test email.")
+        return
+      }
+
+      setTestEmailMessage(`Test email sent to ${data?.sentTo || userEmail}.`)
+    } catch (error) {
+      console.error("Test negative review email error:", error)
+      setTestEmailMessage("Failed to send test email.")
+    } finally {
+      setTestEmailSending(false)
+    }
+  }
+
+  async function exportMyData() {
+    setExportLoading(true)
+    setExportMessage(null)
+
+    try {
+      const token = await getAccessToken()
+
+      if (!token) {
+        setExportMessage("Session expired. Please sign in again.")
+        return
+      }
+
+      const res = await fetch("/api/export-data", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!res.ok) {
+        setExportMessage("Failed to export data. Please try again.")
+        return
+      }
+
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement("a")
+      anchor.href = url
+      anchor.download = `revidew-data-export-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(anchor)
+      anchor.click()
+      document.body.removeChild(anchor)
+      URL.revokeObjectURL(url)
+
+      setExportMessage("Export downloaded.")
+    } catch (error) {
+      console.error("Export data error:", error)
+      setExportMessage("Failed to export data. Please try again.")
+    } finally {
+      setExportLoading(false)
     }
   }
 
@@ -732,6 +822,116 @@ export default function SettingsPage() {
                     Contact Us
                   </Link>
                 </div>
+
+                <div
+                  style={{
+                    borderRadius: 14,
+                    border: "1.5px solid #e2e8f0",
+                    backgroundColor: "#ffffff",
+                    padding: "18px 20px",
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.1em",
+                      color: "#64748b",
+                      margin: "0 0 10px",
+                    }}
+                  >
+                    Data Portability
+                  </p>
+                  <p style={{ fontSize: 13, color: "#334155", margin: "0 0 14px" }}>
+                    Download a JSON file containing all your account data, businesses, reviews, replies, and analytics. This is your right under GDPR Article 20.
+                  </p>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                    <button
+                      onClick={exportMyData}
+                      disabled={exportLoading}
+                      style={{
+                        padding: "8px 14px",
+                        borderRadius: 10,
+                        backgroundColor: exportLoading ? "#cbd5e1" : "#0f172a",
+                        color: "#ffffff",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        border: "none",
+                        cursor: exportLoading ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      {exportLoading ? "Exporting..." : "Export my data"}
+                    </button>
+                    {exportMessage && (
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 12,
+                          color: exportMessage.includes("downloaded") ? "#166534" : "#b45309",
+                        }}
+                      >
+                        {exportMessage}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {showTestEmailControls && (
+                  <div
+                    style={{
+                      borderRadius: 14,
+                      border: "1.5px solid #e2e8f0",
+                      backgroundColor: "#ffffff",
+                      padding: "18px 20px",
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.1em",
+                        color: "#64748b",
+                        margin: "0 0 10px",
+                      }}
+                    >
+                      Email Testing
+                    </p>
+                    <p style={{ fontSize: 13, color: "#334155", margin: "0 0 14px" }}>
+                      Send yourself a sample negative review notification email. This works in local and preview environments, and is blocked in production.
+                    </p>
+                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                      <button
+                        onClick={sendTestNegativeReviewEmail}
+                        disabled={testEmailSending}
+                        style={{
+                          padding: "8px 14px",
+                          borderRadius: 10,
+                          backgroundColor: testEmailSending ? "#cbd5e1" : "#0f766e",
+                          color: "#ffffff",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          border: "none",
+                          cursor: testEmailSending ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        {testEmailSending ? "Sending..." : "Send test negative review email"}
+                      </button>
+                      {testEmailMessage && (
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: 12,
+                            color: testEmailMessage.includes("sent") ? "#166534" : "#b45309",
+                          }}
+                        >
+                          {testEmailMessage}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

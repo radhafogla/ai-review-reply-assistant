@@ -23,6 +23,17 @@ COMMENT ON SCHEMA "public" IS 'standard public schema';
 
 
 
+CREATE TYPE "public"."business_member_role" AS ENUM (
+    'owner',
+    'manager',
+    'responder',
+    'viewer'
+);
+
+
+ALTER TYPE "public"."business_member_role" OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."set_updated_at"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     AS $$
@@ -40,7 +51,19 @@ SET default_tablespace = '';
 SET default_table_access_method = "heap";
 
 
-CREATE TYPE public.business_member_role AS ENUM ('owner', 'manager', 'responder', 'viewer');
+CREATE TABLE IF NOT EXISTS "public"."business_members" (
+    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
+    "business_id" "uuid" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "role" "public"."business_member_role" NOT NULL,
+    "status" "text" DEFAULT 'active'::"text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"(),
+    CONSTRAINT "business_members_status_check" CHECK (("status" = ANY (ARRAY['active'::"text", 'suspended'::"text"])))
+);
+
+
+ALTER TABLE "public"."business_members" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."businesses" (
@@ -57,9 +80,9 @@ CREATE TABLE IF NOT EXISTS "public"."businesses" (
     "sync_status" "text" DEFAULT 'pending'::"text",
     "sync_error" "text",
     "reply_tone" "text" DEFAULT 'professional'::"text",
+    "platform" "text" DEFAULT 'google'::"text" NOT NULL,
     "primary_category" "text",
     "additional_categories" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
-    "platform" "text" DEFAULT 'google'::"text" NOT NULL,
     CONSTRAINT "businesses_platform_check" CHECK (("platform" = ANY (ARRAY['google'::"text", 'yelp'::"text", 'facebook'::"text"])))
 );
 
@@ -149,6 +172,8 @@ CREATE TABLE IF NOT EXISTS "public"."reviews" (
     "last_ai_attempt_at" timestamp with time zone,
     "ai_reply_attempts" integer DEFAULT 0,
     "platform" "text" DEFAULT 'google'::"text" NOT NULL,
+    "last_confirmed_at" timestamp with time zone DEFAULT "now"(),
+    "deleted_at" timestamp with time zone,
     CONSTRAINT "reviews_platform_check" CHECK (("platform" = ANY (ARRAY['google'::"text", 'yelp'::"text", 'facebook'::"text"])))
 );
 
@@ -225,20 +250,13 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
 ALTER TABLE "public"."users" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."business_members" (
-    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
-    "business_id" "uuid" NOT NULL,
-    "user_id" "uuid" NOT NULL,
-    "role" public.business_member_role NOT NULL,
-    "status" "text" NOT NULL DEFAULT 'active'::"text" CHECK (("status" = ANY (ARRAY['active'::"text", 'suspended'::"text"]))),
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "updated_at" timestamp with time zone DEFAULT "now"()
-);
+ALTER TABLE ONLY "public"."business_members"
+    ADD CONSTRAINT "business_members_business_user_unique" UNIQUE ("business_id", "user_id");
 
 
-ALTER TABLE "public"."business_members" OWNER TO "postgres";
 
-
+ALTER TABLE ONLY "public"."business_members"
+    ADD CONSTRAINT "business_members_pkey" PRIMARY KEY ("id");
 
 
 
@@ -249,19 +267,6 @@ ALTER TABLE ONLY "public"."businesses"
 
 ALTER TABLE ONLY "public"."businesses"
     ADD CONSTRAINT "businesses_user_platform_unique" UNIQUE ("user_id", "external_business_id", "platform");
-
-
-
-ALTER TABLE ONLY "public"."business_members"
-    ADD CONSTRAINT "business_members_pkey" PRIMARY KEY ("id");
-
-
-
-ALTER TABLE ONLY "public"."business_members"
-    ADD CONSTRAINT "business_members_business_user_unique" UNIQUE ("business_id", "user_id");
-
-
-
 
 
 
@@ -325,11 +330,27 @@ ALTER TABLE ONLY "public"."users"
 
 
 
+CREATE INDEX "idx_business_members_business_id" ON "public"."business_members" USING "btree" ("business_id");
+
+
+
+CREATE INDEX "idx_business_members_user_id" ON "public"."business_members" USING "btree" ("user_id");
+
+
+
 CREATE INDEX "idx_review_replies_review" ON "public"."review_replies" USING "btree" ("review_id");
 
 
 
 CREATE INDEX "idx_reviews_business" ON "public"."reviews" USING "btree" ("business_id");
+
+
+
+CREATE INDEX "idx_reviews_deleted_at" ON "public"."reviews" USING "btree" ("deleted_at") WHERE ("deleted_at" IS NOT NULL);
+
+
+
+CREATE INDEX "idx_reviews_last_confirmed_at" ON "public"."reviews" USING "btree" ("last_confirmed_at");
 
 
 
@@ -361,20 +382,15 @@ CREATE INDEX "idx_usage_events_user" ON "public"."usage_events" USING "btree" ("
 
 
 
-CREATE INDEX "idx_business_members_business_id" ON "public"."business_members" USING "btree" ("business_id");
-
-CREATE INDEX "idx_business_members_user_id" ON "public"."business_members" USING "btree" ("user_id");
-
-
-
-
-
-
 CREATE UNIQUE INDEX "review_ai_unique" ON "public"."review_replies" USING "btree" ("review_id", "source", "status");
 
 
 
 CREATE OR REPLACE TRIGGER "set_sentiment_cache_updated_at" BEFORE UPDATE ON "public"."sentiment_cache" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
+
+
+
+CREATE OR REPLACE TRIGGER "set_updated_at_business_members" BEFORE UPDATE ON "public"."business_members" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
 
 
 
@@ -410,22 +426,6 @@ CREATE OR REPLACE TRIGGER "set_updated_at_users" BEFORE UPDATE ON "public"."user
 
 
 
-CREATE OR REPLACE TRIGGER "set_updated_at_business_members" BEFORE UPDATE ON "public"."business_members" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
-
-
-
-
-
-
-
-
-
-
-ALTER TABLE ONLY "public"."businesses"
-    ADD CONSTRAINT "businesses_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE;
-
-
-
 ALTER TABLE ONLY "public"."business_members"
     ADD CONSTRAINT "business_members_business_id_fkey" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE CASCADE;
 
@@ -434,6 +434,10 @@ ALTER TABLE ONLY "public"."business_members"
 ALTER TABLE ONLY "public"."business_members"
     ADD CONSTRAINT "business_members_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE;
 
+
+
+ALTER TABLE ONLY "public"."businesses"
+    ADD CONSTRAINT "businesses_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE;
 
 
 
@@ -586,6 +590,11 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 GRANT ALL ON FUNCTION "public"."set_updated_at"() TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."business_members" TO "authenticated";
+GRANT ALL ON TABLE "public"."business_members" TO "service_role";
 
 
 

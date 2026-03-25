@@ -4,7 +4,8 @@ import OpenAI from "openai";
 import { createServerClient, createServiceClient } from "@/lib/supabaseServerClient";
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger";
 import { trackUsageEvent } from "@/lib/usageTracking";
-import { getReplyTonePromptGuidance, normalizeReplyTone, resolveAdaptiveReplyTone } from "@/lib/replyTone";
+import { getReplyTonePromptGuidance, normalizeReplyTone, resolveAdaptiveReplyTone, buildReplyPrompt } from "@/lib/replyTone";
+import { requireTrialOrPaidAccess } from "@/lib/subscriptionAccess";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -63,6 +64,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized", reason: "no_user" }, { status: 401 });
   }
 
+  const accessCheck = await requireTrialOrPaidAccess(user.id, supabase);
+  if (accessCheck.response) {
+    return accessCheck.response;
+  }
+
   const { reviewId, review_text, rating } = await req.json();
   logApiRequest({ requestId, endpoint, userId: user.id, reviewId });
 
@@ -114,32 +120,11 @@ export async function POST(req: NextRequest) {
   });
 
   const toneInstruction = getReplyTonePromptGuidance(effectiveTone);
-
-  const prompt = `
-You are replying to a review as a business owner.
-
-Rating: ${rating} stars
-Review: "${review_text}"
-Use Tone: ${toneInstruction}
-
-Avoid friendly filler phrases like:
-"hey there"
-"thanks for your honest take"
-"hope you find..."
-"we appreciate you pointing this out"
-
-Do not over-apologize or sound overly polite.
-
-Keep the tone slightly direct and grounded, like a real business owner writing quickly.
-
-Avoid explaining intentions like "we want to do better" or "we aim to improve".
-
-Focus on:
-- Acknowledging the issue
-- Reacting to it naturally
-- Keeping it concise and real
-Keep sentences slightly varied in length and avoid overly polished wording.
-It's okay if the reply feels a bit imperfect as long as it feels real.`
+  const prompt = buildReplyPrompt({
+    rating,
+    reviewText: review_text,
+    toneInstruction,
+  });
 
   try {
     const completion = await openai.chat.completions.create({

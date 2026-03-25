@@ -321,10 +321,29 @@ function ConnectBusinessContent() {
               </div>
             </div>
 
+            {connectedBusinesses.length === 0 && (
+              <div style={{ marginTop: 12, borderRadius: 10, border: "1px solid #e2e8f0", backgroundColor: "#f8fafc", padding: "12px 14px" }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                  Before you connect
+                </p>
+                <p style={{ margin: "6px 0 0", fontSize: 13, color: "#475569", lineHeight: 1.6 }}>
+                  Connecting your Google Business Profile grants Revidew read-only access to your business reviews and
+                  profile metadata. We use this data to sync reviews, generate AI-assisted reply suggestions, power
+                  analytics, and send negative-review alerts. Your data is processed by Supabase (database), OpenAI
+                  (reply generation), Resend (email alerts). We do not sell your data.
+                  You can disconnect at any time, and you may request deletion of all your data from{" "}
+                  <Link href="/settings" style={{ color: "#2563eb", fontWeight: 600, textDecoration: "none" }}>Settings</Link>.
+                  See our{" "}
+                  <Link href="/privacy-policy" style={{ color: "#2563eb", fontWeight: 600, textDecoration: "none" }}>Privacy Policy</Link>{" "}
+                  for full details.
+                </p>
+              </div>
+            )}
+
             {hasReachedPlanLimit && (
               <div style={{ marginTop: 12, borderRadius: 10, border: "1px solid #bfdbfe", backgroundColor: "#eff6ff", padding: "10px 12px" }}>
                 <p style={{ margin: 0, fontSize: 13, color: "#1e3a8a", fontWeight: 600 }}>
-                  Free plan supports one connected business. Upgrade to Basic or Premium for multi-business management.
+                  Trial access supports one connected business. Upgrade to Basic or Premium for multi-business management.
                 </p>
                 <Link
                   href="/subscriptions"

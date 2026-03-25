@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useSearchParams } from "next/navigation"
 import { FormEvent, useState } from "react"
@@ -17,6 +18,7 @@ export default function LoginContent() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [agreedToPrivacy, setAgreedToPrivacy] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
   const [authNotice, setAuthNotice] = useState<string | null>(null)
@@ -147,6 +149,11 @@ export default function LoginContent() {
 
     if (password !== confirmPassword) {
       setAuthError("Passwords do not match.")
+      return
+    }
+
+    if (!agreedToPrivacy) {
+      setAuthError("Please agree to the Privacy Policy to create your account.")
       return
     }
 
@@ -370,6 +377,22 @@ export default function LoginContent() {
                 autoComplete="new-password"
                 required
               />
+
+              <label className="mt-1 flex items-start gap-2.5 text-sm text-slate-700" htmlFor="agreePrivacy">
+                <input
+                  id="agreePrivacy"
+                  type="checkbox"
+                  checked={agreedToPrivacy}
+                  onChange={(event) => setAgreedToPrivacy(event.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                />
+                <span>
+                  I agree to the{" "}
+                  <Link href="/privacy-policy" className="font-semibold text-blue-700 hover:text-blue-600" target="_blank">
+                    Privacy Policy
+                  </Link>
+                </span>
+              </label>
             </>
           )}
 

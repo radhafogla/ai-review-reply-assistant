@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabaseServerClient";
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger";
 import { listAccessibleBusinesses } from "@/lib/businessAccess";
 import { type BusinessMemberRole } from "@/lib/businessRoles";
+import { requireTrialOrPaidAccess } from "@/lib/subscriptionAccess";
 
 export async function POST(req: NextRequest) {
   const endpoint = "/api/get-reviews";
@@ -39,6 +40,11 @@ export async function POST(req: NextRequest) {
       { error: "Unauthorized", reviews: null },
       { status: 401 },
     );
+  }
+
+  const accessCheck = await requireTrialOrPaidAccess(user.id, supabase)
+  if (accessCheck.response) {
+    return accessCheck.response
   }
 
   const userId = user.id;
@@ -104,7 +110,8 @@ export async function POST(req: NextRequest) {
     .select("id", { count: "exact", head: true })
     .eq("business_id", selectedBusinessId)
     .eq("needs_ai_reply", true)
-    .eq("is_actionable", false);
+    .eq("is_actionable", false)
+    .is("deleted_at", null);
 
   if (backlogCountError) {
     logApiError({
@@ -121,7 +128,8 @@ export async function POST(req: NextRequest) {
   const { data: allRatings, error: allRatingsError } = await supabase
     .from("reviews")
     .select("rating")
-    .eq("business_id", selectedBusinessId);
+    .eq("business_id", selectedBusinessId)
+    .is("deleted_at", null);
 
   if (allRatingsError) {
     logApiError({
@@ -171,7 +179,8 @@ export async function POST(req: NextRequest) {
       created_at
     )
   `)
-    .eq("business_id", selectedBusinessId);
+    .eq("business_id", selectedBusinessId)
+    .is("deleted_at", null);
 
   if (!includeHistoricalBacklog) {
     reviewsQuery = reviewsQuery.or("is_actionable.eq.true,needs_ai_reply.eq.false");

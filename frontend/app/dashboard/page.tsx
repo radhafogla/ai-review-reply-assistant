@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
 import { useSubscription } from "@/app/hooks/useSubscription"
 import { getTrialEndedUpgradeMessage, hasFeature } from "@/lib/subscription"
@@ -13,6 +14,7 @@ import EmptyState from "../components/EmptyState"
 import { ReviewWithAnalysis } from "../types/review"
 
 export default function Dashboard() {
+  const router = useRouter()
   const { subscription } = useSubscription()
 
   const [reviews, setReviews] = useState<ReviewWithAnalysis[]>([])
@@ -34,8 +36,13 @@ export default function Dashboard() {
       return review.needs_ai_reply && review.is_actionable && (!status || status === "draft" || status === "failed" || status === "deleted")
     }).length
 
-  const backlogReviews = historicalBacklogCount
-  const totalReviews = reviews.length + backlogReviews
+  const backlogReviews = historicalBacklogLoaded
+    ? reviews.filter((review) => review.needs_ai_reply && !review.is_actionable).length
+    : historicalBacklogCount
+
+  const totalReviews = historicalBacklogLoaded
+    ? reviews.length
+    : reviews.length + historicalBacklogCount
 
   const postedReviews =
     reviews.filter((review) => review.latest_reply?.status === "posted").length
@@ -179,6 +186,12 @@ export default function Dashboard() {
       })
     })
 
+    if (res.status === 402) {
+      router.replace("/subscriptions?reason=trial-expired")
+      setLoading(false)
+      return
+    }
+
     const data = await res.json()
 
     if (!Array.isArray(data?.reviews)) {
@@ -236,7 +249,7 @@ export default function Dashboard() {
     if (accessToken && data.reviews.length > 0 && !includeHistoricalBacklog) {
       autoGenerateReplies(data.reviews, accessToken)
     }
-  }, [ensureUserRecord, autoGenerateReplies])
+  }, [ensureUserRecord, autoGenerateReplies, router])
 
   const loadHistoricalBacklog = useCallback(async () => {
     if (historicalBacklogLoaded || loadingHistoricalBacklog) {
@@ -250,6 +263,10 @@ export default function Dashboard() {
       setLoadingHistoricalBacklog(false)
     }
   }, [historicalBacklogLoaded, loadingHistoricalBacklog, loadReviews, selectedBusinessId])
+
+  const refreshDashboard = useCallback(async () => {
+    await loadReviews(selectedBusinessId || undefined, true)
+  }, [loadReviews, selectedBusinessId])
 
   useEffect(() => {
     if (skipNextBusinessFetchRef.current) {
@@ -349,6 +366,40 @@ export default function Dashboard() {
                     Usage: {subscription.warnings.map((warning) => `${warning.label} ${warning.used}/${warning.limit} (${warning.percentUsed}%)`).join(" • ")}
                   </span>
                 )}
+
+                <button
+                  type="button"
+                  onClick={() => void refreshDashboard()}
+                  disabled={loading}
+                  style={{
+                    borderRadius: 999,
+                    border: loading ? "1px solid #cbd5e1" : "1px solid #1d4ed8",
+                    backgroundColor: loading ? "#e2e8f0" : "#2563eb",
+                    color: loading ? "#94a3b8" : "#ffffff",
+                    boxShadow: loading ? "none" : "0 2px 8px rgba(37, 99, 235, 0.35)",
+                    padding: "7px 14px",
+                    fontSize: 12,
+                    fontWeight: 800,
+                    letterSpacing: "0.03em",
+                    transition: "transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease",
+                    cursor: loading ? "not-allowed" : "pointer",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (loading) return
+                    e.currentTarget.style.backgroundColor = "#1d4ed8"
+                    e.currentTarget.style.transform = "translateY(-1px)"
+                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(37, 99, 235, 0.42)"
+                  }}
+                  onMouseLeave={(e) => {
+                    if (loading) return
+                    e.currentTarget.style.backgroundColor = "#2563eb"
+                    e.currentTarget.style.transform = "translateY(0)"
+                    e.currentTarget.style.boxShadow = "0 2px 8px rgba(37, 99, 235, 0.35)"
+                  }}
+                  title="Refresh dashboard and load all reviews for this business scope"
+                >
+                  {loading ? "Refreshing..." : "Refresh dashboard"}
+                </button>
               </div>
 
               <div style={{

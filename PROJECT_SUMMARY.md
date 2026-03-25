@@ -1,15 +1,16 @@
 # AI Review Reply Assistant - Project Summary
 
-Last updated: 2026-03-20
+Last updated: 2026-03-23
 
 ## Executive Summary
 
-AI Review Reply Assistant is a Next.js application for Google Business review operations: connect locations, sync reviews, generate AI-assisted replies, edit drafts, post to Google, and analyze sentiment with premium insight layers. The product now includes team-member collaboration with DB-level roles and role-enforced dashboard/API actions.
+AI Review Reply Assistant is a Next.js application for Google Business review operations: connect locations, sync reviews, automated email alerts for negative reviews, generate AI-assisted replies, edit drafts, post to Google, and analyze sentiment with premium insight layers. The product now includes team-member collaboration with DB-level roles and role-enforced dashboard/API actions.
 
 Current production readiness assessment:
 - Core product flows are implemented and role-hardened.
 - Team members backend and frontend are implemented.
-- Main remaining platform task is Inngest-based automated sync orchestration.
+- Automated sync orchestration is implemented with Inngest.
+- Main remaining production work is release hardening: migration workflow, CI coverage, monitoring polish, and rollout validation.
 
 ## Product Scope
 
@@ -71,14 +72,15 @@ Implemented:
 Feature gating:
 - Analytics and manual sentiment analysis: Basic and Premium
 - Bulk actions: Basic and Premium
-- Multi-business access: Premium
+- Multi-business access: Basic and Premium
 - Premium auto-reply: Premium only
 - Themes, AI suggestions, sentiment trend views: Premium only
+- Negative review email alerts: all plans
 
 Limits:
 - Free Trial: 1 connected business
-- Basic: 1 connected business
-- Premium: 3 connected businesses
+- Basic: 5 connected businesses
+- Premium: 20 connected businesses
 - Per-review AI draft generations: max 5 attempts
 
 ## Team Members and Role Access (Completed)
@@ -159,21 +161,22 @@ Note:
 ## Sync Reviews Status (Current)
 
 Current state in repo:
-- frontend/app/api/sync-reviews/route.ts contains sync + upsert + premium auto-reply logic
-- No scheduler/orchestrator wired yet
-- Inngest orchestration not yet integrated
+- frontend/lib/syncReviewsCore.ts contains the shared sync, upsert, negative-review alert, and premium auto-reply logic
+- frontend/app/api/sync-reviews/route.ts is the authenticated HTTP wrapper for manual sync
+- frontend/inngest/functions/syncReviews.ts handles event-driven and scheduled sync orchestration
+- frontend/app/api/inngest/route.ts exposes the Inngest serve endpoint
 
 Implication:
-- Sync logic exists, but automated orchestration is the remaining major production task.
+- Manual sync and automated recurring sync are both implemented; remaining work is operational hardening and production rollout discipline.
 
 ## Remaining Work Before Production
 
 Primary remaining task:
-1. Integrate Inngest for automated sync orchestration
-2. Trigger initial sync after business connect
-3. Add scheduled recurring sync execution
-4. Add retry/backoff and failure observability
-5. Update README operational notes for Inngest deployment/env vars
+1. Standardize Supabase production migration workflow outside Vercel deploys
+2. Add broader test coverage for critical integration and smoke paths
+3. Finalize monitoring, alert routing, and release verification in production
+4. Validate Google Business production credentials, callback UX, and sync reliability
+5. Tighten deployment/runbook documentation for production operations
 
 ## Key Files To Review
 

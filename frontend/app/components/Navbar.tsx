@@ -120,7 +120,7 @@ export default function Navbar() {
         {/* Left: Logo */}
         <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--neutral-900)' }}>
           <Link href="/" className="transition" style={{ color: 'var(--neutral-900)' }} onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--primary-600)')} onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--neutral-900)')}>
-            Revora
+            Revidew
           </Link>
         </h1>
 

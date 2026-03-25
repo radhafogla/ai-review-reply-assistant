@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { useSubscription } from "@/app/hooks/useSubscription"
-import { getFeatureGateUpgradeHint, hasFeature } from "@/lib/subscription"
+import { getFeatureGateUpgradeHint, getPlanLabel, hasFeature, normalizePlan } from "@/lib/subscription"
 import EmptyState from "@/app/components/EmptyState"
 
 type Bucket = { label: string; value: number }
@@ -601,7 +601,7 @@ export default function AnalyticsPage() {
                 borderRadius: 99, padding: "6px 14px",
               }}>
                 <span style={{ fontSize: 14, color: "#9a3412", fontWeight: 700 }}>
-                  Plan: {(totals?.plan || "free").toUpperCase()} ({totals?.subscriptionStatus || "active"})
+                  Plan: {getPlanLabel(normalizePlan(totals?.plan))} ({totals?.subscriptionStatus || "active"})
                 </span>
               </div>
             </div>

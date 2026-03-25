@@ -6,7 +6,7 @@ import type { GoogleReview, GoogleReviewListResponse } from "@/app/types/googleR
 import { createRequestId, logApiError } from "@/lib/apiLogger"
 import { trackUsageEvent } from "@/lib/usageTracking"
 import { PREMIUM_AUTO_REPLY_DEFAULT_MIN_RATING, hasFeature, normalizePlan } from "@/lib/subscription"
-import { getReplyTonePromptGuidance, normalizeReplyTone, resolveAdaptiveReplyTone, type ReplyTone } from "@/lib/replyTone"
+import { getReplyTonePromptGuidance, normalizeReplyTone, resolveAdaptiveReplyTone, buildReplyPrompt, type ReplyTone } from "@/lib/replyTone"
 
 interface StoredReview {
   review_id: string
@@ -28,6 +28,15 @@ interface FormattedReview {
   review_time: string
   needs_ai_reply: boolean
   is_actionable: boolean
+  last_confirmed_at: string
+  deleted_at: null
+}
+
+export interface NegativeReviewNotificationReview {
+  author_name: string
+  rating: number
+  review_text: string
+  review_time: string
 }
 
 const ACTIONABLE_REVIEW_WINDOW_DAYS = 30
@@ -101,25 +110,9 @@ function normalizeReview(
     review_time: reviewTime,
     needs_ai_reply: needsAiReply,
     is_actionable: isActionable,
+    last_confirmed_at: syncedAt,
+    deleted_at: null,
   }
-}
-
-function shouldUpsert(
-  existingReview: StoredReview | undefined,
-  nextReview: FormattedReview
-): boolean {
-  if (!existingReview) {
-    return true
-  }
-
-  return (
-    existingReview.author_name !== nextReview.author_name ||
-    existingReview.rating !== nextReview.rating ||
-    existingReview.review_text !== nextReview.review_text ||
-    existingReview.review_time !== nextReview.review_time ||
-    existingReview.needs_ai_reply !== nextReview.needs_ai_reply ||
-    existingReview.is_actionable !== nextReview.is_actionable
-  )
 }
 
 function escapeHtml(text: string): string {
@@ -148,14 +141,14 @@ function trimReviewText(reviewText: string, maxLength = 180): string {
   return `${normalized.slice(0, maxLength).trimEnd()}...`
 }
 
-async function sendNegativeReviewNotificationEmail({
+export async function sendNegativeReviewNotificationEmail({
   toEmail,
   businessName,
   reviews,
 }: {
   toEmail: string
   businessName: string
-  reviews: FormattedReview[]
+  reviews: NegativeReviewNotificationReview[]
 }): Promise<{ sent: boolean; error?: string }> {
   if (!resend) {
     return { sent: false, error: "RESEND_API_KEY is not configured" }
@@ -186,6 +179,9 @@ async function sendNegativeReviewNotificationEmail({
       ? `New negative review for ${businessName}`
       : `${reviews.length} new negative reviews for ${businessName}`
 
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "")
+  const dashboardUrl = `${siteUrl}/dashboard`
+
   const result = await resend.emails.send({
     from: fromEmail,
     to: toEmail,
@@ -198,7 +194,8 @@ async function sendNegativeReviewNotificationEmail({
           Responding quickly can reduce churn risk and improve trust.
         </p>
         <ul style="padding-left: 18px; margin: 0 0 18px;">${reviewsHtml}</ul>
-        <p style="color: #64748b; font-size: 13px; margin: 0;">Open Revora to draft and post a response.</p>
+        ${siteUrl ? `<a href="${dashboardUrl}" style="display: inline-block; margin-bottom: 16px; padding: 10px 20px; background-color: #2563eb; color: #ffffff; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 8px;">Open Revidew to draft and post a response.</a>` : ""}
+        <p style="color: #64748b; font-size: 13px; margin: 0;">Open Revidew to draft and post a response.</p>
       </div>
     `,
   })
@@ -212,17 +209,11 @@ async function sendNegativeReviewNotificationEmail({
 
 async function generateAutoReply(review: FormattedReview, tone: ReplyTone): Promise<string> {
   const toneInstruction = getReplyTonePromptGuidance(tone)
-
-  const prompt = `
-You are replying to a Google review as a business owner.
-
-Rating: ${review.rating} stars
-Review: "${review.review_text}"
-${toneInstruction}
-
-Write a professional and friendly reply under 80 words. You dont need to address/greet the user or add regards at the end. Just the message itself is good.
-Make it sound human and conversational, not robotic or overly formal. Use natural everyday wording, avoid generic corporate phrases, and acknowledge one concrete detail from the review when possible.
-`
+  const prompt = buildReplyPrompt({
+    rating: review.rating,
+    reviewText: review.review_text,
+    toneInstruction,
+  })
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
@@ -359,6 +350,7 @@ export async function performBusinessSync(
     .from("reviews")
     .select("review_id, author_name, rating, review_text, review_time, needs_ai_reply, is_actionable, ai_reply_attempts")
     .eq("business_id", business.id)
+    .is("deleted_at", null)
 
   if (existingReviewsError) {
     logApiError({
@@ -401,9 +393,9 @@ export async function performBusinessSync(
       normalizeReview(review, business.id, syncedAt)
     )
 
-    const reviewsToUpsert = formattedReviews.filter((review) =>
-      shouldUpsert(existingByReviewId.get(review.review_id), review)
-    )
+    // Always upsert every review Google returned so last_confirmed_at is refreshed
+    // (Google API ToS: cached data must be refreshed within 30 days)
+    const reviewsToUpsert = formattedReviews
 
     const newNegativeReviews = formattedReviews.filter(
       (review) =>
@@ -460,6 +452,32 @@ export async function performBusinessSync(
           .eq("id", business.id)
 
         throw new Error("Failed to save reviews")
+      }
+    }
+
+    // Soft-delete reviews that Google no longer returns
+    const returnedReviewIds = new Set(dedupedReviews.map((r) => r.reviewId))
+    const missingReviewIds = [...existingByReviewId.keys()].filter(
+      (reviewId) => !returnedReviewIds.has(reviewId)
+    )
+
+    if (missingReviewIds.length > 0) {
+      const { error: softDeleteError } = await serviceSupabase
+        .from("reviews")
+        .update({ deleted_at: new Date().toISOString() })
+        .in("review_id", missingReviewIds)
+        .is("deleted_at", null)
+
+      if (softDeleteError) {
+        logApiError({
+          requestId,
+          endpoint,
+          userId,
+          status: 500,
+          message: "Failed to soft-delete missing reviews",
+          error: softDeleteError,
+          businessId: business.id,
+        })
       }
     }
 

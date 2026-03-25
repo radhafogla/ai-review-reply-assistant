@@ -4,6 +4,7 @@ import { createServerClient, createServiceClient } from "@/lib/supabaseServerCli
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger";
 import { trackUsageEvent } from "@/lib/usageTracking";
 import { assertBusinessRole } from "@/lib/businessAccess";
+import { requireTrialOrPaidAccess } from "@/lib/subscriptionAccess";
 
 export async function POST(req: NextRequest) {
   const endpoint = "/api/post-reply"
@@ -24,6 +25,11 @@ export async function POST(req: NextRequest) {
   if (!user) {
     logApiError({ requestId, endpoint, status: 401, message: "No user in session", error: "no_user" })
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const accessCheck = await requireTrialOrPaidAccess(user.id, supabase)
+  if (accessCheck.response) {
+    return accessCheck.response
   }
 
   const { reviewId, replyText } = await req.json();

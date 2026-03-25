@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server"
 import { createServerClient } from "@/lib/supabaseServerClient"
 import { hasFeature, normalizePlan } from "@/lib/subscription"
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
+import { requireTrialOrPaidAccess } from "@/lib/subscriptionAccess"
 
 type Bucket = { label: string; value: number }
 type DateRangePreset = "7d" | "30d" | "90d" | "custom"
@@ -102,6 +103,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  const accessCheck = await requireTrialOrPaidAccess(user.id, supabase)
+  if (accessCheck.response) {
+    return accessCheck.response
+  }
+
   logApiRequest({ requestId, endpoint, userId: user.id })
   const body = await req.json().catch(() => ({}))
   const requestedBusinessId = typeof body?.businessId === "string" ? body.businessId : null
@@ -146,6 +152,7 @@ export async function POST(req: NextRequest) {
     .from("reviews")
     .select("id, rating, latest_reply_id, review_time, created_at")
     .eq("business_id", selectedBusinessId)
+    .is("deleted_at", null)
 
   // Fetch unfiltered all-time counts so the stat cards always show totals, not range-scoped numbers.
   // These are only needed when a date range is applied (Premium); Basic users get full data anyway.
@@ -154,6 +161,7 @@ export async function POST(req: NextRequest) {
         .from("reviews")
         .select("id")
         .eq("business_id", selectedBusinessId)
+        .is("deleted_at", null)
         .then(({ data }) => (data ?? []).map((r) => r.id))
     : []
 
@@ -163,6 +171,7 @@ export async function POST(req: NextRequest) {
           .from("reviews")
           .select("id", { count: "exact", head: true })
           .eq("business_id", selectedBusinessId)
+          .is("deleted_at", null)
           .then(({ count }) => count ?? 0),
         businessReviewIds.length
           ? supabase

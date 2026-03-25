@@ -6,6 +6,7 @@ import { getValidAccessToken } from "@/lib/googleAuth"
 import { createServerClient } from "@/lib/supabaseServerClient"
 import { GoogleLocation } from "@/app/types/location"
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
+import { requireTrialOrPaidAccess } from "@/lib/subscriptionAccess"
 
 function extractCategoryLabel(category: unknown): string | null {
   if (!category || typeof category !== "object") {
@@ -59,6 +60,12 @@ export async function GET(req: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
+
+  const accessCheck = await requireTrialOrPaidAccess(user.id, supabase)
+  if (accessCheck.response) {
+    return accessCheck.response
+  }
+
   logApiRequest({ requestId, endpoint, userId: user.id })
 
   try {

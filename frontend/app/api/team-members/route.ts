@@ -4,6 +4,7 @@ import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
 import { assertBusinessRole, getBusinessAccess, listAccessibleBusinesses, type AccessibleBusiness } from "@/lib/businessAccess"
 import { BUSINESS_ROLES, hasPermission, type BusinessMemberRole } from "@/lib/businessRoles"
 import { createServerClient, createServiceClient } from "@/lib/supabaseServerClient"
+import { requireTrialOrPaidAccess } from "@/lib/subscriptionAccess"
 
 type TeamMemberRecord = {
   id: string
@@ -170,6 +171,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const accessCheck = await requireTrialOrPaidAccess(user.id, supabase)
+    if (accessCheck.response) {
+      return accessCheck.response
+    }
+
     const requestedBusinessId = req.nextUrl.searchParams.get("businessId")?.trim() || null
     const { businesses, error } = await listAccessibleBusinesses(user.id, supabase)
 
@@ -225,6 +231,11 @@ export async function POST(req: NextRequest) {
 
     if (!user || !supabase) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const accessCheck = await requireTrialOrPaidAccess(user.id, supabase)
+    if (accessCheck.response) {
+      return accessCheck.response
     }
 
     const body = await req.json().catch(() => null)
@@ -292,6 +303,11 @@ export async function PATCH(req: NextRequest) {
 
     if (!user || !supabase) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const accessCheck = await requireTrialOrPaidAccess(user.id, supabase)
+    if (accessCheck.response) {
+      return accessCheck.response
     }
 
     const body = await req.json().catch(() => null)
@@ -367,6 +383,11 @@ export async function DELETE(req: NextRequest) {
 
     if (!user || !supabase) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const accessCheck = await requireTrialOrPaidAccess(user.id, supabase)
+    if (accessCheck.response) {
+      return accessCheck.response
     }
 
     const body = await req.json().catch(() => null)

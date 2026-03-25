@@ -1,20 +1,29 @@
-# AI Review Reply Assistant
+# Revidew
 
-AI Review Reply Assistant is a Next.js application for connecting Google Business Profile locations, syncing reviews, generating AI-assisted replies, posting responses back to Google, and tracking review workflow state in Supabase.
+Revidew is a review operations workspace for Google Business Profile teams. It helps businesses connect locations, sync reviews into one dashboard, generate AI-assisted replies, post responses back to Google, and track review workflow state in Supabase.
 
-## What It Does
+The current product is strongest for single-location businesses and growing teams, with support for multi-business accounts, role-based collaboration, negative review alerts, and premium analytics layers.
 
-- Connects one or more Google Business Profile locations to a user account
-- Supports both email/password authentication and Google OAuth sign-in
-- Includes a forgot-password flow with secure reset email links and in-app password update
-- Syncs Google reviews into Supabase
-- Generates draft replies with OpenAI
-- Lets users edit drafts before posting them
-- Tracks reply source and status across `draft`, `posted`, `failed`, and `deleted`
-- Surfaces analytics and workflow views for reviews that need attention versus already posted replies
-- Includes subscription-based feature gating for analytics, bulk actions, and multi-business support
-- Captures structured API logs and Sentry error reports for server-side failures
-- Provides a contact form backed by Supabase and Resend
+## Product Snapshot
+
+- Connect one or more Google Business Profile locations to a user account
+- Sign in with email/password or Google OAuth
+- Sync Google reviews into a central review inbox
+- Generate AI draft replies with configurable brand voice
+- Edit drafts before posting them live to Google
+- Track reply source and status across `draft`, `posted`, `failed`, and `deleted`
+- Separate reviews that need attention from already posted and deleted work
+- Run sentiment analysis and unlock premium themes, suggestions, and trend views
+- Send negative review email alerts with direct dashboard CTA links
+- Support business-scoped team collaboration with owner, manager, responder, and viewer access
+- Apply subscription gating for analytics, bulk actions, multi-business support, and premium auto-reply
+- Capture structured API logs and Sentry error reports for server-side failures
+
+## Who It's For
+
+- Local businesses that want a faster review response workflow
+- Small teams that need shared access to review operations without losing control over permissions
+- Multi-location operators who want one place to sync, review, and respond across connected businesses
 
 ## Tech Stack
 
@@ -64,18 +73,21 @@ AI Review Reply Assistant is a Next.js application for connecting Google Busines
 
 The app currently supports three plans:
 
-- `free`: AI generation only
-- `basic`: AI generation, analytics, bulk actions
-- `premium`: AI generation, analytics, bulk actions, multi-business support
+- `free`: AI generation, negative review email alerts, single-business setup
+- `basic`: AI generation, analytics, bulk actions, and multi-business support
+- `premium`: AI generation, analytics, bulk actions, multi-business support, premium insights, and premium auto-reply
 
 The feature gates live in [frontend/lib/subscription.ts](frontend/lib/subscription.ts).
 
 ## API Surface
 
-The app currently exposes 20 route handlers under [frontend/app/api](frontend/app/api):
+The app currently exposes route handlers under [frontend/app/api](frontend/app/api) for:
 
 - `analytics`
+- `analytics/internal`
 - `analyze-review`
+- `analyze-reviews`
+- `auto-generate-reply`
 - `auth/signup`
 - `connect-google-business`
 - `contact`
@@ -90,10 +102,15 @@ The app currently exposes 20 route handlers under [frontend/app/api](frontend/ap
 - `google-locations`
 - `inngest` (webhook for Inngest orchestration)
 - `post-reply`
+- `premium-auto-reply`
+- `reply-tone`
 - `save-business`
 - `save-reply`
+- `sentiment-cache`
 - `subscription`
 - `sync-reviews`
+- `team-members`
+- `test-negative-review-email` (non-production only)
 
 ## Recent Auth And UX Updates
 
@@ -118,9 +135,10 @@ The baseline schema is in [schema.sql](schema.sql). The main tables are:
 - `review_replies`: generated, edited, posted, failed, and deleted replies
 - `review_analysis`: AI sentiment and summary results
 - `usage_events`: authoritative server-side usage tracking for key product actions
+- `business_members`: per-business team membership and roles
 - `contact_submissions`: contact form submissions
 
-There is also a Supabase migration in [supabase/migrations/20260317_add_deleted_review_reply_status.sql](supabase/migrations/20260317_add_deleted_review_reply_status.sql).
+The current baseline migration is [supabase/migrations/20260317_000000_baseline_schema.sql](supabase/migrations/20260317_000000_baseline_schema.sql).
 
 ## Environment Variables
 
@@ -134,24 +152,30 @@ SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=
 RESEND_API_KEY=
 NEXT_PUBLIC_SENTRY_DSN=
+NEXT_PUBLIC_SENTRY_ENVIRONMENT=development
+SENTRY_ENVIRONMENT=development
 
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
+GOOGLE_OAUTH_STATE_SECRET=
+
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+REVIEW_ALERT_FROM_EMAIL=
 
 INNGEST_EVENT_KEY=
 INNGEST_SIGNING_KEY=
 INNGEST_SYNC_REVIEWS_CRON=0 */6 * * *
-
-NEXTAUTH_SECRET=
-NEXTAUTH_URL=http://localhost:3000
 ```
 
 Notes:
 
 - `NEXT_PUBLIC_SENTRY_DSN` is enough for Sentry error capture.
+- `NEXT_PUBLIC_SENTRY_ENVIRONMENT` and `SENTRY_ENVIRONMENT` should be set per environment (`development`, `preview`, `production`) so Sentry alerts can be filtered correctly.
 - `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` are optional and only needed if you want source map upload during builds.
 - `RESEND_API_KEY` is required for the contact form email notification flow.
+- `REVIEW_ALERT_FROM_EMAIL` is optional but recommended for branded negative-review alert emails.
 - `SUPABASE_SERVICE_ROLE_KEY` is used by privileged server-side flows.
+- `NEXT_PUBLIC_SITE_URL` is used for absolute links in emails and callbacks.
 - `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` are obtained from your [Inngest dashboard](https://app.inngest.com) and required for background sync jobs. Set these for production deployments to Vercel.
 - `INNGEST_SYNC_REVIEWS_CRON` controls the recurring sync schedule (cron expression). If omitted, the default is `0 */6 * * *` (every 6 hours).
 
@@ -189,6 +213,7 @@ npm run dev
 npm run build
 npm run start
 npm run lint
+npm test
 ```
 
 ## Monitoring And Logging
@@ -204,6 +229,8 @@ npm run lint
 - `save-reply` converts the reply source to `user` when the draft is edited
 - `post-reply` now persists the actual submitted text and preserves `ai` only when the text is unchanged
 - The dashboard separates reviews into `needs attention`, `posted`, and `deleted` lanes
+- `reply-tone` stores the default business reply tone, which now defaults to `casual` in app logic
+- Negative review email alerts are generated from `syncReviewsCore` and can be test-triggered outside production from Settings
 
 ## Automated Review Sync with Inngest
 
@@ -251,9 +278,11 @@ This project is structured to deploy the Next.js app from the `frontend` directo
 Before production deployment, make sure:
 
 - Supabase environment variables are set in your host
+- Supabase schema migrations are applied separately from the Vercel app deploy
 - Google OAuth redirect URIs match the deployed URL
 - Resend is configured with a valid sender strategy
 - Sentry DSN is set in production
+- Sentry environment variables are set so production and non-production events are separated
 - Optional Sentry source map variables are added if you want readable production stack traces
 
 ## Production Rollout Guide

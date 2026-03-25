@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { createServerClient } from "@/lib/supabaseServerClient"
-import { hasFeature } from "@/lib/subscription"
+import { hasFeature, normalizePlan } from "@/lib/subscription"
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
+import { requireTrialOrPaidAccess } from "@/lib/subscriptionAccess"
 
 export async function GET(req: NextRequest) {
   const endpoint = "/api/sentiment-cache"
@@ -30,6 +31,11 @@ export async function GET(req: NextRequest) {
       error: userError?.message ?? "no_user"
     })
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const accessCheck = await requireTrialOrPaidAccess(user.id, supabase)
+  if (accessCheck.response) {
+    return accessCheck.response
   }
 
   const { searchParams } = new URL(req.url)
@@ -67,7 +73,7 @@ export async function GET(req: NextRequest) {
     .eq("id", user.id)
     .maybeSingle()
 
-  const userPlan = userRow?.plan || "free"
+  const userPlan = normalizePlan(userRow?.plan)
   const canUsePremium = hasFeature(userPlan, "advancedAnalytics")
 
   logApiRequest({ requestId, endpoint, userId: user.id, businessId })

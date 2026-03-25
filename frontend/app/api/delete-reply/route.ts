@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server"
 import { createServerClient } from "@/lib/supabaseServerClient"
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
 import { assertBusinessRole } from "@/lib/businessAccess"
+import { requireTrialOrPaidAccess } from "@/lib/subscriptionAccess"
 
 export async function POST(req: NextRequest) {
   const endpoint = "/api/delete-reply"
@@ -24,6 +25,11 @@ export async function POST(req: NextRequest) {
   if (userError || !user) {
     logApiError({ requestId, endpoint, status: 401, message: "Invalid or missing user", error: userError?.message ?? "no_user" })
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const accessCheck = await requireTrialOrPaidAccess(user.id, supabase)
+  if (accessCheck.response) {
+    return accessCheck.response
   }
 
   const { reviewId } = await req.json().catch(() => ({}))

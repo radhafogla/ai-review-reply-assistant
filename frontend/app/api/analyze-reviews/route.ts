@@ -2,8 +2,9 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import OpenAI from "openai"
 import { createServerClient } from "@/lib/supabaseServerClient"
-import { hasFeature } from "@/lib/subscription"
+import { hasFeature, normalizePlan } from "@/lib/subscription"
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
+import { requireTrialOrPaidAccess } from "@/lib/subscriptionAccess"
 import { trackUsageEvent } from "@/lib/usageTracking"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
@@ -246,6 +247,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  const accessCheck = await requireTrialOrPaidAccess(user.id, supabase)
+  if (accessCheck.response) {
+    return accessCheck.response
+  }
+
   const body = await req.json().catch(() => ({}))
   const businessId = typeof body.businessId === "string" ? body.businessId : null
   const forceRefresh = body.forceRefresh === true
@@ -282,7 +288,7 @@ export async function POST(req: NextRequest) {
     .eq("id", user.id)
     .maybeSingle()
 
-  const userPlan = userRow?.plan || "free"
+  const userPlan = normalizePlan(userRow?.plan)
   const canUsePremium = hasFeature(userPlan, "advancedAnalytics")
   const businessPrimaryCategory = typeof business?.primary_category === "string"
     ? business.primary_category

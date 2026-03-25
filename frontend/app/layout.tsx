@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Revora | Feedback Intelligence for Growing Teams",
+  title: "Revidew | Feedback Intelligence for Growing Teams",
   description:
-    "Revora helps businesses analyze reviews, detect customer trends, and respond faster with AI-powered workflows.",
+    "Revidew helps businesses analyze reviews, detect customer trends, and respond faster with AI-powered workflows.",
 };
 
 export default function RootLayout({
