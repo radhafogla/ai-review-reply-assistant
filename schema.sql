@@ -467,7 +467,12 @@ ALTER TABLE ONLY "public"."reviews"
 
 
 ALTER TABLE ONLY "public"."reviews"
-    ADD CONSTRAINT "reviews_latest_reply_id_fkey" FOREIGN KEY ("latest_reply_id") REFERENCES "public"."review_replies"("id");
+    ADD CONSTRAINT "reviews_latest_reply_id_fkey" FOREIGN KEY ("latest_reply_id") REFERENCES "public"."review_replies"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."sentiment_cache"
+    ADD CONSTRAINT "sentiment_cache_business_id_fkey" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE CASCADE;
 
 
 

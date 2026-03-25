@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
 
       // Delete in reverse order of foreign key dependencies
       if (reviewIds.length > 0) {
-        // Delete review replies
+        // Delete review replies (latest_reply_id FK is ON DELETE SET NULL)
         const { error: deleteRepliesError } = await supabase
           .from("review_replies")
           .delete()
@@ -91,9 +91,49 @@ export async function POST(req: NextRequest) {
       if (deleteReviewsError) {
         throw deleteReviewsError
       }
+
+      // Delete sentiment cache
+      const { error: deleteSentimentError } = await supabase
+        .from("sentiment_cache")
+        .delete()
+        .in("business_id", businessIds)
+
+      if (deleteSentimentError) {
+        throw deleteSentimentError
+      }
+
+      // Delete usage events linked to businesses
+      const { error: deleteUsageEventsError } = await supabase
+        .from("usage_events")
+        .delete()
+        .in("business_id", businessIds)
+
+      if (deleteUsageEventsError) {
+        throw deleteUsageEventsError
+      }
     }
 
-    // Delete businesses
+    // Delete remaining usage events linked to user
+    const { error: deleteUserUsageError } = await supabase
+      .from("usage_events")
+      .delete()
+      .eq("user_id", userId)
+
+    if (deleteUserUsageError) {
+      throw deleteUserUsageError
+    }
+
+    // Delete subscriptions
+    const { error: deleteSubsError } = await supabase
+      .from("subscriptions")
+      .delete()
+      .eq("user_id", userId)
+
+    if (deleteSubsError) {
+      throw deleteSubsError
+    }
+
+    // Delete businesses (cascades business_members)
     const { error: deleteBusinessesError } = await supabase
       .from("businesses")
       .delete()
