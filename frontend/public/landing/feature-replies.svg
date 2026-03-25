@@ -1,0 +1,15 @@
+<svg width="800" height="520" viewBox="0 0 800 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="800" height="520" rx="26" fill="#fff7ed"/>
+  <rect x="40" y="40" width="720" height="440" rx="22" fill="white" stroke="#fed7aa"/>
+  <text x="76" y="92" fill="#7c2d12" font-family="Arial, sans-serif" font-size="24" font-weight="800">AI Reply Studio</text>
+  <rect x="76" y="116" width="650" height="1" fill="#fed7aa"/>
+  <rect x="76" y="150" width="648" height="110" rx="14" fill="#fffaf5" stroke="#fed7aa"/>
+  <text x="96" y="184" fill="#9a3412" font-family="Arial, sans-serif" font-size="16" font-weight="700">Customer review</text>
+  <text x="96" y="212" fill="#7c2d12" font-family="Arial, sans-serif" font-size="14">"Great staff, but service took too long during lunch."</text>
+  <rect x="76" y="280" width="648" height="154" rx="14" fill="#fff" stroke="#fdba74"/>
+  <text x="96" y="314" fill="#9a3412" font-family="Arial, sans-serif" font-size="16" font-weight="700">Draft reply</text>
+  <text x="96" y="342" fill="#7c2d12" font-family="Arial, sans-serif" font-size="14">"Thanks for your honest feedback. We are improving lunch-hour staffing"</text>
+  <text x="96" y="364" fill="#7c2d12" font-family="Arial, sans-serif" font-size="14">"to speed up service and deliver a better experience next visit."</text>
+  <rect x="552" y="390" width="172" height="34" rx="9" fill="#f43f5e"/>
+  <text x="602" y="412" fill="white" font-family="Arial, sans-serif" font-size="13" font-weight="700">Publish</text>
+</svg>

@@ -1,0 +1,28 @@
+<svg width="800" height="520" viewBox="0 0 800 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="800" height="520" rx="26" fill="#f8fafc"/>
+  <rect x="40" y="40" width="720" height="440" rx="22" fill="white" stroke="#cbd5e1"/>
+  <text x="76" y="92" fill="#0f172a" font-family="Arial, sans-serif" font-size="24" font-weight="800">Trend Watch</text>
+  <rect x="76" y="116" width="650" height="1" fill="#cbd5e1"/>
+
+  <line x1="120" y1="400" x2="690" y2="400" stroke="#cbd5e1"/>
+  <line x1="120" y1="180" x2="120" y2="400" stroke="#cbd5e1"/>
+
+  <polyline points="130,350 220,330 310,300 400,280 490,238 580,214 670,188" stroke="#10b981" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <polyline points="130,270 220,276 310,290 400,308 490,324 580,336 670,348" stroke="#f43f5e" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <circle cx="670" cy="188" r="8" fill="#10b981"/>
+  <circle cx="670" cy="348" r="8" fill="#f43f5e"/>
+
+  <rect x="518" y="146" width="194" height="34" rx="8" fill="#ecfdf5" stroke="#bbf7d0"/>
+  <text x="538" y="168" fill="#166534" font-family="Arial, sans-serif" font-size="13" font-weight="700">Positive trend: +22%</text>
+
+  <rect x="518" y="360" width="194" height="34" rx="8" fill="#fff1f2" stroke="#fecdd3"/>
+  <text x="538" y="382" fill="#9f1239" font-family="Arial, sans-serif" font-size="13" font-weight="700">Complaints: -14%</text>
+
+  <text x="126" y="430" fill="#64748b" font-family="Arial, sans-serif" font-size="12">Jan</text>
+  <text x="238" y="430" fill="#64748b" font-family="Arial, sans-serif" font-size="12">Feb</text>
+  <text x="350" y="430" fill="#64748b" font-family="Arial, sans-serif" font-size="12">Mar</text>
+  <text x="462" y="430" fill="#64748b" font-family="Arial, sans-serif" font-size="12">Apr</text>
+  <text x="574" y="430" fill="#64748b" font-family="Arial, sans-serif" font-size="12">May</text>
+  <text x="666" y="430" fill="#64748b" font-family="Arial, sans-serif" font-size="12">Jun</text>
+</svg>

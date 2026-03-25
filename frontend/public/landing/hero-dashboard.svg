@@ -1,0 +1,64 @@
+<svg width="1200" height="760" viewBox="0 0 1200 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff1f2"/>
+      <stop offset="1" stop-color="#fff7ed"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f8fafc"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="760" rx="28" fill="url(#bg)"/>
+  <rect x="36" y="32" width="1128" height="696" rx="22" fill="white" stroke="#e2e8f0"/>
+  <rect x="36" y="32" width="1128" height="54" rx="22" fill="#0f172a"/>
+  <circle cx="72" cy="59" r="8" fill="#fb7185"/>
+  <circle cx="96" cy="59" r="8" fill="#fbbf24"/>
+  <circle cx="120" cy="59" r="8" fill="#34d399"/>
+
+  <rect x="72" y="122" width="268" height="560" rx="18" fill="#f8fafc" stroke="#e2e8f0"/>
+  <rect x="92" y="152" width="228" height="16" rx="8" fill="#334155"/>
+  <rect x="92" y="186" width="160" height="10" rx="5" fill="#94a3b8"/>
+  <rect x="92" y="220" width="228" height="74" rx="12" fill="white" stroke="#e2e8f0"/>
+  <rect x="106" y="236" width="92" height="10" rx="5" fill="#0f172a"/>
+  <rect x="106" y="252" width="182" height="8" rx="4" fill="#64748b"/>
+  <rect x="106" y="268" width="142" height="8" rx="4" fill="#94a3b8"/>
+  <rect x="92" y="308" width="228" height="74" rx="12" fill="white" stroke="#e2e8f0"/>
+  <rect x="106" y="324" width="110" height="10" rx="5" fill="#0f172a"/>
+  <rect x="106" y="340" width="192" height="8" rx="4" fill="#64748b"/>
+  <rect x="106" y="356" width="130" height="8" rx="4" fill="#94a3b8"/>
+
+  <rect x="374" y="122" width="754" height="260" rx="18" fill="url(#card)" stroke="#e2e8f0"/>
+  <text x="404" y="162" fill="#0f172a" font-family="Arial, sans-serif" font-size="24" font-weight="700">Revora Command Desk</text>
+  <rect x="404" y="188" width="690" height="1" fill="#e2e8f0"/>
+  <rect x="404" y="220" width="210" height="128" rx="14" fill="white" stroke="#e2e8f0"/>
+  <text x="424" y="252" fill="#334155" font-family="Arial, sans-serif" font-size="16" font-weight="700">Response speed</text>
+  <text x="424" y="294" fill="#0f172a" font-family="Arial, sans-serif" font-size="34" font-weight="800">2.7x</text>
+  <text x="424" y="320" fill="#64748b" font-family="Arial, sans-serif" font-size="14">faster this month</text>
+
+  <rect x="638" y="220" width="210" height="128" rx="14" fill="white" stroke="#e2e8f0"/>
+  <text x="658" y="252" fill="#334155" font-family="Arial, sans-serif" font-size="16" font-weight="700">Coverage</text>
+  <text x="658" y="294" fill="#0f172a" font-family="Arial, sans-serif" font-size="34" font-weight="800">91%</text>
+  <text x="658" y="320" fill="#64748b" font-family="Arial, sans-serif" font-size="14">review reply rate</text>
+
+  <rect x="872" y="220" width="222" height="128" rx="14" fill="white" stroke="#e2e8f0"/>
+  <text x="892" y="252" fill="#334155" font-family="Arial, sans-serif" font-size="16" font-weight="700">Trend signal</text>
+  <text x="892" y="294" fill="#0f172a" font-family="Arial, sans-serif" font-size="28" font-weight="800">+22%</text>
+  <text x="892" y="320" fill="#64748b" font-family="Arial, sans-serif" font-size="14">service sentiment</text>
+
+  <rect x="374" y="402" width="364" height="280" rx="18" fill="white" stroke="#e2e8f0"/>
+  <text x="404" y="438" fill="#0f172a" font-family="Arial, sans-serif" font-size="20" font-weight="700">Theme clusters</text>
+  <rect x="404" y="462" width="304" height="10" rx="5" fill="#f43f5e"/>
+  <rect x="404" y="486" width="254" height="10" rx="5" fill="#fb7185"/>
+  <rect x="404" y="510" width="206" height="10" rx="5" fill="#fdba74"/>
+  <text x="404" y="548" fill="#475569" font-family="Arial, sans-serif" font-size="14">Top issue: wait-time mentions</text>
+
+  <rect x="764" y="402" width="364" height="280" rx="18" fill="white" stroke="#e2e8f0"/>
+  <text x="794" y="438" fill="#0f172a" font-family="Arial, sans-serif" font-size="20" font-weight="700">Action coach</text>
+  <rect x="794" y="462" width="304" height="182" rx="12" fill="#fff7ed" stroke="#fed7aa"/>
+  <text x="812" y="494" fill="#9a3412" font-family="Arial, sans-serif" font-size="14" font-weight="700">Recommendation</text>
+  <text x="812" y="520" fill="#7c2d12" font-family="Arial, sans-serif" font-size="14">Add one team member</text>
+  <text x="812" y="542" fill="#7c2d12" font-family="Arial, sans-serif" font-size="14">during weekend peak hours.</text>
+  <text x="812" y="578" fill="#7c2d12" font-family="Arial, sans-serif" font-size="13">Predicted impact:</text>
+  <text x="812" y="600" fill="#9a3412" font-family="Arial, sans-serif" font-size="20" font-weight="800">-18% complaints</text>
+</svg>

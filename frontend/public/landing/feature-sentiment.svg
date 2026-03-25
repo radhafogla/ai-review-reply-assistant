@@ -1,0 +1,24 @@
+<svg width="800" height="520" viewBox="0 0 800 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="800" height="520" rx="26" fill="#fff1f2"/>
+  <rect x="40" y="40" width="720" height="440" rx="22" fill="white" stroke="#fecdd3"/>
+  <text x="76" y="92" fill="#9f1239" font-family="Arial, sans-serif" font-size="24" font-weight="800">Sentiment Radar</text>
+  <rect x="76" y="116" width="650" height="1" fill="#fecdd3"/>
+  <circle cx="220" cy="274" r="120" fill="#ffe4e6" stroke="#fda4af" stroke-width="10"/>
+  <path d="M220 154 A120 120 0 0 1 334 242" stroke="#fb7185" stroke-width="16" fill="none" stroke-linecap="round"/>
+  <path d="M334 242 A120 120 0 0 1 302 348" stroke="#f43f5e" stroke-width="16" fill="none" stroke-linecap="round"/>
+  <path d="M302 348 A120 120 0 0 1 138 348" stroke="#fda4af" stroke-width="16" fill="none" stroke-linecap="round"/>
+  <text x="182" y="282" fill="#9f1239" font-family="Arial, sans-serif" font-size="34" font-weight="800">74%</text>
+  <text x="157" y="306" fill="#be123c" font-family="Arial, sans-serif" font-size="14">positive tone</text>
+
+  <rect x="400" y="170" width="300" height="64" rx="12" fill="#fff7ed" stroke="#fed7aa"/>
+  <text x="420" y="198" fill="#9a3412" font-family="Arial, sans-serif" font-size="14" font-weight="700">Top positive theme</text>
+  <text x="420" y="220" fill="#7c2d12" font-family="Arial, sans-serif" font-size="14">Staff friendliness</text>
+
+  <rect x="400" y="250" width="300" height="64" rx="12" fill="#fef2f2" stroke="#fecaca"/>
+  <text x="420" y="278" fill="#b91c1c" font-family="Arial, sans-serif" font-size="14" font-weight="700">Top negative theme</text>
+  <text x="420" y="300" fill="#991b1b" font-family="Arial, sans-serif" font-size="14">Weekend wait time</text>
+
+  <rect x="400" y="330" width="300" height="64" rx="12" fill="#f0fdf4" stroke="#bbf7d0"/>
+  <text x="420" y="358" fill="#166534" font-family="Arial, sans-serif" font-size="14" font-weight="700">Recommended focus</text>
+  <text x="420" y="380" fill="#14532d" font-family="Arial, sans-serif" font-size="14">Peak-hour staffing</text>
+</svg>
