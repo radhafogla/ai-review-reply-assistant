@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
   // Send admin notification email
   const adminEmailResult = await resend.emails.send({
     from: "onboarding@resend.dev",
-    to: "radha_aeie2000@yahoo.com",
+    to: "support@revidew.com",
     subject: `Review AI Contact Form: ${subject.trim()}`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">

@@ -520,6 +520,18 @@ CREATE POLICY "Users access own subscriptions" ON "public"."subscriptions" USING
 
 
 
+CREATE POLICY "Users can access own business memberships" ON "public"."business_members" USING ((EXISTS ( SELECT 1
+   FROM "public"."businesses" "b"
+  WHERE (("b"."id" = "business_members"."business_id") AND ("b"."user_id" = "auth"."uid"())))));
+
+
+
+CREATE POLICY "Users can access own sentiment cache" ON "public"."sentiment_cache" USING ((EXISTS ( SELECT 1
+   FROM "public"."businesses" "b"
+  WHERE (("b"."id" = "sentiment_cache"."business_id") AND ("b"."user_id" = "auth"."uid"())))));
+
+
+
 CREATE POLICY "Users can access their own businesses" ON "public"."businesses" FOR SELECT USING (("auth"."uid"() = "user_id"));
 
 
@@ -556,6 +568,9 @@ CREATE POLICY "Users can read/update themselves" ON "public"."users" USING (("au
 
 
 
+ALTER TABLE "public"."business_members" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."businesses" ENABLE ROW LEVEL SECURITY;
 
 
@@ -572,6 +587,9 @@ ALTER TABLE "public"."review_replies" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."reviews" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."sentiment_cache" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."subscriptions" ENABLE ROW LEVEL SECURITY;
@@ -615,7 +633,27 @@ GRANT INSERT ON TABLE "public"."contact_submissions" TO "anon";
 
 
 GRANT ALL ON TABLE "public"."integrations" TO "service_role";
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."integrations" TO "authenticated";
+GRANT DELETE ON TABLE "public"."integrations" TO "authenticated";
+
+
+
+GRANT SELECT("id") ON TABLE "public"."integrations" TO "authenticated";
+
+
+
+GRANT SELECT("user_id") ON TABLE "public"."integrations" TO "authenticated";
+
+
+
+GRANT SELECT("provider") ON TABLE "public"."integrations" TO "authenticated";
+
+
+
+GRANT SELECT("created_at") ON TABLE "public"."integrations" TO "authenticated";
+
+
+
+GRANT SELECT("updated_at") ON TABLE "public"."integrations" TO "authenticated";
 
 
 

@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
     // Fetch integrations
     const { data: integrations, error: integrationsError } = await supabase
       .from("integrations")
-      .select("id, platform, connected_at")
+      .select("id, provider, created_at")
       .eq("user_id", userId)
 
     if (integrationsError) throw integrationsError

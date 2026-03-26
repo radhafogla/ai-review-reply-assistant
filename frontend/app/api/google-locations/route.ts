@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { getValidAccessToken } from "@/lib/googleAuth"
-import { createServerClient } from "@/lib/supabaseServerClient"
+import { createServerClient, createServiceClient } from "@/lib/supabaseServerClient"
 import { GoogleLocation } from "@/app/types/location"
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
 import { requireTrialOrPaidAccess } from "@/lib/subscriptionAccess"
@@ -69,8 +69,8 @@ export async function GET(req: NextRequest) {
   logApiRequest({ requestId, endpoint, userId: user.id })
 
   try {
-
-    const accessToken = await getValidAccessToken(user.id, supabase)
+    const serviceSupabase = createServiceClient()
+    const accessToken = await getValidAccessToken(user.id, serviceSupabase)
 
     // Step 1: get accounts
     const accountsRes = await fetch(
@@ -84,9 +84,15 @@ export async function GET(req: NextRequest) {
 
     const accountsData = await accountsRes.json()
 
+    if (!accountsRes.ok) {
+      console.error(`[${requestId}] Google accounts API error:`, accountsRes.status, JSON.stringify(accountsData))
+      return NextResponse.json({ error: "Failed to fetch Google accounts", detail: accountsData }, { status: 502 })
+    }
+
     const account = accountsData.accounts?.[0]
 
     if (!account) {
+      console.warn(`[${requestId}] No Google Business accounts found for user ${user.id}`)
       return NextResponse.json({ locations: [] })
     }
 
@@ -101,6 +107,11 @@ export async function GET(req: NextRequest) {
     )
 
     const locationsData = await locationsRes.json()
+
+    if (!locationsRes.ok) {
+      console.error(`[${requestId}] Google locations API error:`, locationsRes.status, JSON.stringify(locationsData))
+      return NextResponse.json({ error: "Failed to fetch Google locations", detail: locationsData }, { status: 502 })
+    }
 
     const accountId = account.name.split("/").pop() || ""
     const locations: GoogleLocation[] = (locationsData.locations || []).map((loc: GoogleLocation & {
@@ -132,6 +143,11 @@ export async function GET(req: NextRequest) {
       message: "Failed to fetch Google locations",
       error: err,
     })
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    const isTokenMissing = errorMessage.includes("No Google token found") || errorMessage.includes("refresh token missing")
+    if (isTokenMissing) {
+      return NextResponse.json({ error: "Google account not connected", reconnectRequired: true }, { status: 401 })
+    }
     return NextResponse.json({ error: "Failed to fetch locations" }, { status: 500 })
   }
 }

@@ -75,7 +75,7 @@ export default function Hero() {
               </div>
               <div className="rounded-2xl bg-white/80 p-4" style={{ borderColor: 'var(--neutral-200)', borderWidth: '1px' }}>
                 <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--neutral-500)' }}>Setup time</p>
-                <p className="mt-2 text-2xl font-black" style={{ color: 'var(--neutral-900)' }}>10 minutes</p>
+                <p className="mt-2 text-2xl font-black" style={{ color: 'var(--neutral-900)' }}>5 minutes</p>
               </div>
             </div>
           </div>
