@@ -5,7 +5,7 @@ const PrivacyPolicyPage = () => {
     <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 px-4 py-10 text-slate-800 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-4xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">Privacy Policy</h1>
-        <p className="mt-3 text-sm text-slate-600">Last updated: March 18, 2026</p>
+        <p className="mt-3 text-sm text-slate-600">Last updated: March 26, 2026</p>
 
         <section className="mt-8 space-y-3">
           <h2 className="text-xl font-semibold text-slate-900">1. Information We Collect</h2>
@@ -52,12 +52,35 @@ const PrivacyPolicyPage = () => {
         <section className="mt-8 space-y-3">
           <h2 className="text-xl font-semibold text-slate-900">5. Data Retention</h2>
           <p className="leading-7 text-slate-700">
-            We retain data while your account is active or as needed to provide the service, comply with legal
+            We retain your data while your account is active or as needed to provide the service, comply with legal
             obligations, resolve disputes, and enforce agreements.
           </p>
           <p className="leading-7 text-slate-700">
-            Review text, generated replies, and related analytics may be retained until account deletion or until you
-            request deletion, subject to legal and operational requirements.
+            Review text, generated replies, sentiment analysis, and related analytics are retained until you take
+            action to delete them or until account deletion.
+          </p>
+          <p className="font-medium leading-7 text-slate-800">You have the following deletion options:</p>
+          <ul className="list-disc space-y-1.5 pl-6 leading-7 text-slate-700">
+            <li>
+              <span className="font-semibold">Remove a business</span> — deletes the business and all associated
+              reviews, replies, analysis, and analytics data immediately.
+            </li>
+            <li>
+              <span className="font-semibold">Delete my data</span> — available in Settings. Removes all businesses,
+              reviews, replies, and analytics while keeping your account active so you can reconnect later.
+            </li>
+            <li>
+              <span className="font-semibold">Delete my account</span> — available in Settings. Permanently removes
+              your account and all associated data.
+            </li>
+          </ul>
+          <p className="leading-7 text-slate-700">
+            Anonymized usage analytics (event counts and types with no personally identifiable information) may be
+            retained after deletion for product improvement purposes.
+          </p>
+          <p className="leading-7 text-slate-700">
+            Reviews that are no longer returned by Google are marked inactive and permanently removed when the
+            associated business is deleted or when you request data deletion.
           </p>
         </section>
 

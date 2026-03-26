@@ -6,6 +6,7 @@ export type UsageEventType =
   | "auto_reply_failed"
   | "auto_reply_posted"
   | "business_connected"
+  | "business_deleted"
   | "limit_warning_shown"
   | "negative_review_notification_failed"
   | "negative_review_notification_sent"

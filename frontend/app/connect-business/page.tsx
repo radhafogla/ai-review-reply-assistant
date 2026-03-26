@@ -44,9 +44,26 @@ function ConnectBusinessContent() {
   const [loadingBusinesses, setLoadingBusinesses] = useState(false)
   const [loadingLocations, setLoadingLocations] = useState(false)
   const [savingBusinessId, setSavingBusinessId] = useState<string | null>(null)
+  const [deletingBusinessId, setDeletingBusinessId] = useState<string | null>(null)
+  const [confirmDeleteBusiness, setConfirmDeleteBusiness] = useState<BusinessConnection | null>(null)
   const [showAddPanel, setShowAddPanel] = useState(false)
   const [connectNotice, setConnectNotice] = useState<string | null>(null)
+  const [connectSuccess, setConnectSuccess] = useState<string | null>(null)
   const shouldRedirectAfterAuth = searchParams.get("postAuth") === "1"
+  const googleStatus = searchParams.get("google")
+  const googleReason = searchParams.get("reason")
+
+  useEffect(() => {
+    if (googleStatus === "connected") {
+      setConnectSuccess("Google Business Profile connected successfully. Click \"Add Google Business\" to select a location.")
+    } else if (googleStatus === "error") {
+      setConnectNotice(
+        googleReason === "consent_denied"
+          ? "Google access was denied. Please try again and grant the requested permissions."
+          : `Google connection failed${googleReason ? ` (${googleReason})` : ""}. Please try again.`
+      )
+    }
+  }, [googleStatus, googleReason])
 
   const loadSession = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -191,7 +208,7 @@ function ConnectBusinessContent() {
     const { reconnectRequired } = await fetchLocations()
 
     if (reconnectRequired) {
-      setConnectNotice("Please reconnect Google to load your available locations.")
+      setConnectNotice("Your Google connection has expired. Reconnecting now...")
       setShowAddPanel(false)
       await handleConnectGoogle()
     }
@@ -231,6 +248,38 @@ function ConnectBusinessContent() {
       console.error("Error saving business", err)
     } finally {
       setSavingBusinessId(null)
+    }
+  }
+
+  async function handleDeleteBusiness(business: BusinessConnection) {
+    if (!accessToken || !userId) return
+
+    setConfirmDeleteBusiness(null)
+    setDeletingBusinessId(business.id)
+
+    try {
+      const res = await fetch("/api/delete-business", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ businessId: business.id }),
+      })
+
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        console.error("Error deleting business", data)
+        setConnectNotice(data.error || "Failed to remove business. Please try again.")
+        return
+      }
+
+      await loadConnectedBusinesses(userId)
+    } catch (err) {
+      console.error("Error deleting business", err)
+      setConnectNotice("Failed to remove business. Please try again.")
+    } finally {
+      setDeletingBusinessId(null)
     }
   }
 
@@ -282,43 +331,23 @@ function ConnectBusinessContent() {
                 </p>
               </div>
 
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button
-                  type="button"
-                  onClick={handleConnectGoogle}
-                  disabled={hasReachedPlanLimit || subscriptionLoading}
-                  style={{
-                    padding: "8px 14px",
-                    borderRadius: 10,
-                    border: `1px solid ${hasReachedPlanLimit || subscriptionLoading ? "#cbd5e1" : "#1d4ed8"}`,
-                    backgroundColor: hasReachedPlanLimit || subscriptionLoading ? "#e2e8f0" : "#2563eb",
-                    color: hasReachedPlanLimit || subscriptionLoading ? "#94a3b8" : "#fff",
-                    fontWeight: 700,
-                    fontSize: 13,
-                    cursor: hasReachedPlanLimit || subscriptionLoading ? "not-allowed" : "pointer",
-                  }}
-                >
-                  Connect Google
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleAddAnotherClick}
-                  disabled={hasReachedPlanLimit || subscriptionLoading}
-                  style={{
-                    padding: "8px 14px",
-                    borderRadius: 10,
-                    border: `1px solid ${hasReachedPlanLimit || subscriptionLoading ? "#cbd5e1" : "#94a3b8"}`,
-                    backgroundColor: hasReachedPlanLimit || subscriptionLoading ? "#e2e8f0" : "#f8fafc",
-                    color: hasReachedPlanLimit || subscriptionLoading ? "#94a3b8" : "#1e293b",
-                    fontWeight: 700,
-                    fontSize: 13,
-                    cursor: hasReachedPlanLimit || subscriptionLoading ? "not-allowed" : "pointer",
-                  }}
-                >
-                  Add another business
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleAddAnotherClick}
+                disabled={hasReachedPlanLimit || subscriptionLoading}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 10,
+                  border: `1px solid ${hasReachedPlanLimit || subscriptionLoading ? "#cbd5e1" : "#1d4ed8"}`,
+                  backgroundColor: hasReachedPlanLimit || subscriptionLoading ? "#e2e8f0" : "#2563eb",
+                  color: hasReachedPlanLimit || subscriptionLoading ? "#94a3b8" : "#fff",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: hasReachedPlanLimit || subscriptionLoading ? "not-allowed" : "pointer",
+                }}
+              >
+                Add Google Business
+              </button>
             </div>
 
             {connectedBusinesses.length === 0 && (
@@ -354,6 +383,14 @@ function ConnectBusinessContent() {
               </div>
             )}
 
+            {connectSuccess && (
+              <div style={{ marginTop: 12, borderRadius: 10, border: "1px solid #bbf7d0", backgroundColor: "#f0fdf4", padding: "10px 12px" }}>
+                <p style={{ margin: 0, fontSize: 13, color: "#166534", fontWeight: 600 }}>
+                  {connectSuccess}
+                </p>
+              </div>
+            )}
+
             {connectNotice && (
               <div style={{ marginTop: 12, borderRadius: 10, border: "1px solid #bfdbfe", backgroundColor: "#eff6ff", padding: "10px 12px" }}>
                 <p style={{ margin: 0, fontSize: 13, color: "#1e3a8a", fontWeight: 600 }}>
@@ -372,7 +409,7 @@ function ConnectBusinessContent() {
           {loadingBusinesses ? (
             <div style={{ padding: 16, fontSize: 14, color: "#64748b" }}>Loading businesses...</div>
           ) : connectedBusinesses.length === 0 ? (
-            <div style={{ padding: 16, fontSize: 14, color: "#64748b" }}>No businesses connected yet. Click &quot;Connect Google&quot; to start.</div>
+            <div style={{ padding: 16, fontSize: 14, color: "#64748b" }}>No businesses connected yet. Click &quot;Add Google Business&quot; to start.</div>
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -382,6 +419,7 @@ function ConnectBusinessContent() {
                     <th style={{ textAlign: "left", padding: "12px 14px", fontSize: 12, color: "#64748b" }}>External Business ID</th>
                     <th style={{ textAlign: "left", padding: "12px 14px", fontSize: 12, color: "#64748b" }}>Platform</th>
                     <th style={{ textAlign: "left", padding: "12px 14px", fontSize: 12, color: "#64748b" }}>Connected</th>
+                    <th style={{ textAlign: "right", padding: "12px 14px", fontSize: 12, color: "#64748b" }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -418,6 +456,26 @@ function ConnectBusinessContent() {
                       </td>
                       <td style={{ padding: "12px 14px", fontSize: 13, color: "#334155" }}>
                         {business.connected_at ? new Date(business.connected_at).toLocaleString() : "-"}
+                      </td>
+                      <td style={{ padding: "12px 14px", textAlign: "right" }}>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteBusiness(business)}
+                          disabled={deletingBusinessId === business.id}
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: 6,
+                            border: "1px solid #fecaca",
+                            backgroundColor: deletingBusinessId === business.id ? "#fef2f2" : "#fff",
+                            color: "#dc2626",
+                            fontWeight: 600,
+                            fontSize: 12,
+                            cursor: deletingBusinessId === business.id ? "not-allowed" : "pointer",
+                            opacity: deletingBusinessId === business.id ? 0.6 : 1,
+                          }}
+                        >
+                          {deletingBusinessId === business.id ? "Removing..." : "Remove"}
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -494,6 +552,100 @@ function ConnectBusinessContent() {
           </section>
         )}
       </div>
+
+      {confirmDeleteBusiness && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 50,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(15, 23, 42, 0.5)",
+            padding: 16,
+          }}
+          onClick={() => setConfirmDeleteBusiness(null)}
+        >
+          <div
+            style={{
+              backgroundColor: "#fff",
+              borderRadius: 16,
+              boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
+              maxWidth: 420,
+              width: "100%",
+              overflow: "hidden",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ padding: "20px 24px 0" }}>
+              <div style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 40,
+                height: 40,
+                borderRadius: 10,
+                backgroundColor: "#fef2f2",
+                marginBottom: 14,
+              }}>
+                <span style={{ fontSize: 20, color: "#dc2626" }}>&#9888;</span>
+              </div>
+              <h3 style={{ margin: "0 0 6px", fontSize: 17, fontWeight: 800, color: "#0f172a" }}>
+                Remove business?
+              </h3>
+              <p style={{ margin: "0 0 4px", fontSize: 14, color: "#0f172a", lineHeight: 1.6 }}>
+                This will permanently delete <strong>{confirmDeleteBusiness.name || "this business"}</strong> and all its data:
+              </p>
+              <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 14, color: "#1e293b", lineHeight: 2, listStyleType: "disc" }}>
+                <li>All synced reviews</li>
+                <li>Generated and posted replies</li>
+                <li>Sentiment analysis and analytics</li>
+              </ul>
+            </div>
+            <div style={{
+              display: "flex",
+              gap: 8,
+              justifyContent: "flex-end",
+              padding: "16px 24px 20px",
+              marginTop: 8,
+            }}>
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteBusiness(null)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  border: "1px solid #e2e8f0",
+                  backgroundColor: "#fff",
+                  color: "#334155",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteBusiness(confirmDeleteBusiness)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  border: "1px solid #dc2626",
+                  backgroundColor: "#dc2626",
+                  color: "#fff",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                Remove permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

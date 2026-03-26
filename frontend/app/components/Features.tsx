@@ -1,25 +1,11 @@
 'use client'
 
-import Image from "next/image"
-import { useState, useEffect } from "react"
-
-const VISUALS = [
-  {
-    title: "Reply flow",
-    src: "/landing/feature-replies.svg",
-    alt: "AI reply workflow preview",
-  },
-  {
-    title: "Sentiment signal",
-    src: "/landing/feature-sentiment.svg",
-    alt: "Sentiment analysis preview",
-  },
-  {
-    title: "Trend movement",
-    src: "/landing/feature-trends.svg",
-    alt: "Trend analytics preview",
-  },
-]
+// TODO: Restore image carousel (VISUALS) when real screenshots are ready
+// const VISUALS = [
+//   { title: "Reply flow", src: "/landing/feature-replies.svg", alt: "AI reply workflow preview" },
+//   { title: "Sentiment signal", src: "/landing/feature-sentiment.svg", alt: "Sentiment analysis preview" },
+//   { title: "Trend movement", src: "/landing/feature-trends.svg", alt: "Trend analytics preview" },
+// ]
 
 export default function Features() {
   const features = [
@@ -54,27 +40,6 @@ export default function Features() {
       status: "Live now",
     },
   ]
-
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentImageIndex((prev) => (prev + 1) % VISUALS.length)
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const goToImage = (index: number) => {
-    setCurrentImageIndex(index)
-  }
-
-  const nextImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % VISUALS.length)
-  }
-
-  const prevImage = () => {
-    setCurrentImageIndex((prev) => (prev - 1 + VISUALS.length) % VISUALS.length)
-  }
 
   const workflowSteps = [
     {
@@ -113,93 +78,50 @@ export default function Features() {
           </p>
         </div>
 
-        {/* Primary Visual Showcase */}
-        <div className="mx-auto mb-16 max-w-3xl overflow-hidden rounded-2xl bg-white shadow-sm" style={{ borderColor: 'var(--neutral-200)', borderWidth: '1px' }}>
-          <div className="relative aspect-[600/390] w-full overflow-hidden">
-            {VISUALS.map((visual, index) => {
-              let translateClass = "translate-x-full"
-              if (index === currentImageIndex) {
-                translateClass = "translate-x-0"
-              } else if (index < currentImageIndex) {
-                translateClass = "-translate-x-full"
-              }
-              return (
-                <div
-                  key={visual.title}
-                  className={`absolute inset-0 transition-transform duration-500 ease-out ${translateClass}`}
-                >
-                  <Image
-                    src={visual.src}
-                    alt={visual.alt}
-                    fill
-                    className="h-auto w-full object-cover"
-                  />
-                </div>
-              )
-            })}
-            <button
-              onClick={prevImage}
-              className="absolute left-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full transition"
-              style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)', color: 'var(--neutral-700)' }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--primary-500)';
-                e.currentTarget.style.color = 'white';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
-                e.currentTarget.style.color = 'var(--neutral-700)';
-              }}
-              aria-label="Previous image"
-            >
-              <span className="text-lg font-bold">&lt;</span>
-            </button>
-
-            <button
-              onClick={nextImage}
-              className="absolute right-4 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full transition"
-              style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)', color: 'var(--neutral-700)' }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--primary-500)';
-                e.currentTarget.style.color = 'white';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
-                e.currentTarget.style.color = 'var(--neutral-700)';
-              }}
-              aria-label="Next image"
-            >
-              <span className="text-lg font-bold">&gt;</span>
-            </button>
-
+        {/* Before / After Comparison */}
+        <div className="mx-auto mb-16 grid max-w-4xl gap-4 md:grid-cols-2">
+          <div className="rounded-2xl p-6 shadow-sm" style={{ borderColor: 'var(--neutral-200)', borderWidth: '1px', backgroundColor: 'var(--neutral-50)' }}>
+            <p className="mb-4 text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--neutral-400)' }}>Without Revidew</p>
+            <ul className="space-y-3 text-base leading-6" style={{ color: 'var(--neutral-500)' }}>
+              <li className="flex items-start gap-2.5">
+                <span className="mt-0.5 shrink-0 text-base" style={{ color: 'var(--neutral-400)' }}>✗</span>
+                Reviews scattered across tabs and apps
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="mt-0.5 shrink-0 text-base" style={{ color: 'var(--neutral-400)' }}>✗</span>
+                Negative feedback sits unanswered for days
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="mt-0.5 shrink-0 text-base" style={{ color: 'var(--neutral-400)' }}>✗</span>
+                Hours spent writing replies from scratch
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="mt-0.5 shrink-0 text-base" style={{ color: 'var(--neutral-400)' }}>✗</span>
+                No idea what themes keep coming up
+              </li>
+            </ul>
           </div>
 
-          <div className="px-4 py-3" style={{ borderTopColor: 'var(--neutral-100)', borderTopWidth: '1px' }}>
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold" style={{ color: 'var(--neutral-700)' }}>{VISUALS[currentImageIndex].title}</p>
-            </div>
-            <div className="flex gap-2">
-              {VISUALS.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => goToImage(index)}
-                  className="h-2 w-2 rounded-full transition-colors"
-                  style={{
-                    backgroundColor: index === currentImageIndex ? 'var(--primary-500)' : 'var(--neutral-300)'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (index !== currentImageIndex) {
-                      e.currentTarget.style.backgroundColor = 'var(--neutral-400)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (index !== currentImageIndex) {
-                      e.currentTarget.style.backgroundColor = 'var(--neutral-300)';
-                    }
-                  }}
-                  aria-label={`Go to image ${index + 1}`}
-                />
-              ))}
-            </div>
+          <div className="rounded-2xl bg-white p-6 shadow-sm" style={{ borderColor: 'var(--primary-200)', borderWidth: '1px' }}>
+            <p className="mb-4 text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--primary-500)' }}>With Revidew</p>
+            <ul className="space-y-3 text-base leading-6" style={{ color: 'var(--neutral-700)' }}>
+              <li className="flex items-start gap-2.5">
+                <span className="mt-0.5 shrink-0 text-base" style={{ color: 'var(--primary-500)' }}>✓</span>
+                Every review in one clean dashboard
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="mt-0.5 shrink-0 text-base" style={{ color: 'var(--primary-500)' }}>✓</span>
+                Instant email alerts on low-star reviews
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="mt-0.5 shrink-0 text-base" style={{ color: 'var(--primary-500)' }}>✓</span>
+                AI-drafted replies in your brand voice, published in seconds
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="mt-0.5 shrink-0 text-base" style={{ color: 'var(--primary-500)' }}>✓</span>
+                Sentiment analysis surfaces recurring patterns
+              </li>
+            </ul>
           </div>
         </div>
 

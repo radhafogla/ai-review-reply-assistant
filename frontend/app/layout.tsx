@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Revidew | Feedback Intelligence for Growing Teams",
+  title: "Revidew | AI Review Management & Reply Assistant",
   description:
-    "Revidew helps businesses analyze reviews, detect customer trends, and respond faster with AI-powered workflows.",
+    "Revidew helps businesses analyze reviews, generate smart replies, respond faster with AI-powered workflow and detect customer trends",
 };
 
 export default function RootLayout({

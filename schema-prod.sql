@@ -80,9 +80,9 @@ CREATE TABLE IF NOT EXISTS "public"."businesses" (
     "sync_status" "text" DEFAULT 'pending'::"text",
     "sync_error" "text",
     "reply_tone" "text" DEFAULT 'professional'::"text",
-    "platform" "text" DEFAULT 'google'::"text" NOT NULL,
     "primary_category" "text",
     "additional_categories" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
+    "platform" "text" DEFAULT 'google'::"text" NOT NULL,
     CONSTRAINT "businesses_platform_check" CHECK (("platform" = ANY (ARRAY['google'::"text", 'yelp'::"text", 'facebook'::"text"])))
 );
 
@@ -138,6 +138,9 @@ CREATE TABLE IF NOT EXISTS "public"."review_replies" (
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
     "review_id" "uuid",
     "reply_text" "text",
+    "tone_base" "text",
+    "tone_effective" "text",
+    "tone_adapted" boolean DEFAULT false,
     "source" "text",
     "status" "text" DEFAULT 'draft'::"text",
     "created_at" timestamp with time zone DEFAULT "now"(),
@@ -145,9 +148,6 @@ CREATE TABLE IF NOT EXISTS "public"."review_replies" (
     "posted_to_google" boolean DEFAULT false,
     "user_id" "uuid",
     "updated_at" timestamp with time zone DEFAULT "now"(),
-    "tone_base" "text",
-    "tone_effective" "text",
-    "tone_adapted" boolean DEFAULT false,
     CONSTRAINT "review_replies_source_check" CHECK (("source" = ANY (ARRAY['ai'::"text", 'user'::"text", 'system'::"text"]))),
     CONSTRAINT "review_replies_status_check" CHECK (("status" = ANY (ARRAY['draft'::"text", 'approved'::"text", 'posted'::"text", 'failed'::"text", 'deleted'::"text"])))
 );
@@ -239,10 +239,10 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
     "trial_start" timestamp with time zone DEFAULT "now"(),
     "trial_end" timestamp with time zone,
     "plan" "text" DEFAULT 'free'::"text",
-    "created_at" timestamp with time zone DEFAULT "now"(),
-    "updated_at" timestamp with time zone DEFAULT "now"(),
     "premium_auto_reply_enabled" boolean DEFAULT false NOT NULL,
     "premium_auto_reply_min_rating" integer DEFAULT 5 NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"(),
     CONSTRAINT "users_premium_auto_reply_min_rating_check" CHECK ((("premium_auto_reply_min_rating" >= 1) AND ("premium_auto_reply_min_rating" <= 5)))
 );
 
@@ -616,8 +616,8 @@ GRANT ALL ON FUNCTION "public"."set_updated_at"() TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."business_members" TO "authenticated";
 GRANT ALL ON TABLE "public"."business_members" TO "service_role";
+GRANT ALL ON TABLE "public"."business_members" TO "authenticated";
 
 
 
@@ -627,21 +627,31 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."businesses" TO "authenticat
 
 
 GRANT ALL ON TABLE "public"."contact_submissions" TO "service_role";
-GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."contact_submissions" TO "authenticated";
 GRANT INSERT ON TABLE "public"."contact_submissions" TO "anon";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."contact_submissions" TO "authenticated";
 
 
 
 GRANT ALL ON TABLE "public"."integrations" TO "service_role";
 GRANT DELETE ON TABLE "public"."integrations" TO "authenticated";
 
+
+
 GRANT SELECT("id") ON TABLE "public"."integrations" TO "authenticated";
+
+
 
 GRANT SELECT("user_id") ON TABLE "public"."integrations" TO "authenticated";
 
+
+
 GRANT SELECT("provider") ON TABLE "public"."integrations" TO "authenticated";
 
+
+
 GRANT SELECT("created_at") ON TABLE "public"."integrations" TO "authenticated";
+
+
 
 GRANT SELECT("updated_at") ON TABLE "public"."integrations" TO "authenticated";
 
@@ -662,8 +672,8 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."reviews" TO "authenticated"
 
 
 
-GRANT ALL ON TABLE "public"."sentiment_cache" TO "authenticated";
 GRANT ALL ON TABLE "public"."sentiment_cache" TO "service_role";
+GRANT ALL ON TABLE "public"."sentiment_cache" TO "authenticated";
 
 
 
