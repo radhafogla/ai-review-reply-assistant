@@ -315,7 +315,7 @@ function ConnectBusinessContent() {
             <h1 style={{ margin: "8px 0 0", fontSize: 30, fontWeight: 800, color: "#fff", letterSpacing: "-0.4px" }}>
               Connect and manage businesses
             </h1>
-            <p style={{ marginTop: 8, marginBottom: 0, maxWidth: 680, fontSize: 14, color: "#94a3b8" }}>
+            <p style={{ marginTop: 8, marginBottom: 0, fontSize: 15, color: "#cbd5e1" }}>
               Keep your connected locations in one place. Add another business anytime and choose where reviews sync from.
             </p>
           </div>

@@ -13,12 +13,15 @@ export default function Navbar() {
   const { subscription } = useSubscription()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [activeSection, setActiveSection] = useState<string>("")
-  const [nowMs, setNowMs] = useState<number>(() => Date.now())
+  const [trialTimeLabel, setTrialTimeLabel] = useState<string>("")
+  const [userEmail, setUserEmail] = useState<string>("")
+  const [showUserMenu, setShowUserMenu] = useState(false)
 
   useEffect(() => {
     async function loadSession() {
       const { data } = await supabase.auth.getSession()
       setIsAuthenticated(Boolean(data.session))
+      setUserEmail(data.session?.user?.email ?? "")
     }
 
     loadSession()
@@ -27,6 +30,7 @@ export default function Navbar() {
       data: { subscription }
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsAuthenticated(Boolean(session))
+      if (session?.user?.email) setUserEmail(session.user.email)
     })
 
     return () => {
@@ -81,26 +85,25 @@ export default function Navbar() {
   }, [pathname])
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setNowMs(Date.now())
-    }, 60 * 1000)
+    function computeLabel(): string {
+      if (subscription.plan !== "free" || !subscription.trialEnd) return ""
+      const diffMs = new Date(subscription.trialEnd).getTime() - Date.now()
+      if (diffMs <= 0) return "Expired"
+      const totalMinutes = Math.floor(diffMs / (1000 * 60))
+      const days = Math.floor(totalMinutes / (60 * 24))
+      const hours = Math.floor((totalMinutes % (60 * 24)) / 60)
+      const minutes = totalMinutes % 60
+      return `${days}d ${hours}h ${minutes}m left`
+    }
 
-    return () => window.clearInterval(timer)
-  }, [])
+    const init = setTimeout(() => setTrialTimeLabel(computeLabel()), 0)
+    const timer = setInterval(() => setTrialTimeLabel(computeLabel()), 60_000)
 
-  const trialTimeLabel = (() => {
-    if (subscription.plan !== "free" || !subscription.trialEnd) return ""
-
-    const diffMs = new Date(subscription.trialEnd).getTime() - nowMs
-    if (diffMs <= 0) return "Expired"
-
-    const totalMinutes = Math.floor(diffMs / (1000 * 60))
-    const days = Math.floor(totalMinutes / (60 * 24))
-    const hours = Math.floor((totalMinutes % (60 * 24)) / 60)
-    const minutes = totalMinutes % 60
-
-    return `${days}d ${hours}h ${minutes}m left`
-  })()
+    return () => {
+      clearTimeout(init)
+      clearInterval(timer)
+    }
+  }, [subscription.plan, subscription.trialEnd])
 
   const getNavLinkClass = (isActive: boolean) => {
     return `inline-flex cursor-pointer items-center rounded-md px-2 py-1 text-sm font-semibold tracking-wide transition-all duration-200 ease-out border-b-2 ${
@@ -294,16 +297,88 @@ export default function Navbar() {
           )}
 
           {isAuthenticated ? (
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="inline-flex items-center justify-center rounded-lg px-6 py-2.5 text-sm font-medium text-white shadow-sm transition"
-              style={{ backgroundColor: 'var(--neutral-900)' }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--primary-600)')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--neutral-900)')}
+            <div
+              style={{ position: "relative" }}
+              onMouseEnter={() => setShowUserMenu(true)}
+              onMouseLeave={() => setShowUserMenu(false)}
             >
-              Logout
-            </button>
+              <button
+                type="button"
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: "50%",
+                  border: "none",
+                  backgroundColor: "var(--primary-600)",
+                  color: "#fff",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  textTransform: "uppercase",
+                  transition: "background-color 150ms ease",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--primary-700)")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--primary-600)")}
+                title={userEmail}
+              >
+                {userEmail ? userEmail[0] : "U"}
+              </button>
+
+              {showUserMenu && (
+                <div
+                  style={{
+                    position: "absolute",
+                    right: 0,
+                    top: "100%",
+                    paddingTop: 6,
+                    zIndex: 100,
+                  }}
+                >
+                  <div
+                    style={{
+                      minWidth: 220,
+                      backgroundColor: "#fff",
+                      borderRadius: 10,
+                      border: "1px solid #e2e8f0",
+                      boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div style={{ padding: "12px 14px", borderBottom: "1px solid #f1f5f9" }}>
+                      <p style={{ margin: 0, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "#94a3b8" }}>
+                        Signed in as
+                      </p>
+                      <p style={{ margin: "4px 0 0", fontSize: 13, fontWeight: 600, color: "#0f172a", wordBreak: "break-all" }}>
+                        {userEmail}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      style={{
+                        width: "100%",
+                        padding: "10px 14px",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#dc2626",
+                        backgroundColor: "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        transition: "background-color 100ms ease",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#fef2f2")}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
             <>
               <Link

@@ -474,7 +474,7 @@ export default function ReviewList({
     }
 
     return (
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-3">
         {needsAttention.map((review) => (
           <ReviewCard
             key={review.id}
@@ -508,7 +508,7 @@ export default function ReviewList({
     }
 
     return (
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-3">
         {posted.map((review) => (
           <ReviewCard
             key={review.id}
@@ -539,7 +539,7 @@ export default function ReviewList({
     }
 
     return (
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-3">
         {deletedReplies.map((review) => (
           <ReviewCard
             key={review.id}
@@ -584,7 +584,7 @@ export default function ReviewList({
     }
 
     return (
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-3">
         {backlog.map((review) => (
           <ReviewCard
             key={review.id}

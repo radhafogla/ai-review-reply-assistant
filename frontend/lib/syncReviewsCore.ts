@@ -154,7 +154,7 @@ export async function sendNegativeReviewNotificationEmail({
     return { sent: false, error: "RESEND_API_KEY is not configured" }
   }
 
-  const fromEmail = process.env.REVIEW_ALERT_FROM_EMAIL || "onboarding@resend.dev"
+  const fromEmail = process.env.REVIEW_ALERT_FROM_EMAIL || "Revidew <noreply@mail.revidew.com>"
 
   const reviewsHtml = reviews
     .map((review) => {

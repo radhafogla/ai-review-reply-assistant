@@ -543,7 +543,7 @@ export default function SettingsPage() {
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc" }}>
-      <div style={{ maxWidth: 1680, margin: "0 auto", padding: "32px 24px 40px" }}>
+      <div style={{ maxWidth: 1680, margin: "0 auto", padding: "24px 24px 32px" }}>
         {/* Header Card */}
         <section style={{
           marginBottom: 24, borderRadius: 20, overflow: "hidden",
@@ -551,23 +551,23 @@ export default function SettingsPage() {
           boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
         }}>
           {/* Dark banner */}
-          <div style={{ backgroundColor: "#0f172a", padding: "24px 32px" }}>
+          <div style={{ backgroundColor: "#0f172a", padding: "20px 28px" }}>
             <p style={{
-              fontSize: 11, fontWeight: 700, letterSpacing: "0.16em",
+              fontSize: 14, fontWeight: 700, letterSpacing: "0.16em",
               textTransform: "uppercase", color: "#fcd34d", margin: 0,
             }}>
               Account management
             </p>
-            <h1 style={{ fontSize: 32, fontWeight: 800, color: "#ffffff", margin: "8px 0 0", letterSpacing: "-0.5px" }}>
+            <h1 style={{ fontSize: 30, fontWeight: 800, color: "#ffffff", margin: "8px 0 0", letterSpacing: "-0.4px" }}>
               Settings
             </h1>
-            <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 6, maxWidth: 560 }}>
+            <p style={{ fontSize: 15, color: "#cbd5e1", marginTop: 6, marginBottom: 0 }}>
               Manage your account preferences and data.
             </p>
           </div>
 
           {/* Tabs */}
-          <div style={{ borderBottom: "1px solid #e2e8f0", padding: "0 32px", display: "flex", gap: 32 }}>
+          <div style={{ borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 28 }}>
             <button
               onClick={() => {
                 setActiveTab("account")
@@ -576,7 +576,7 @@ export default function SettingsPage() {
                 setDeletingType(null)
               }}
               style={{
-                padding: "16px 0",
+                padding: "12px 0",
                 fontSize: 14,
                 fontWeight: 600,
                 borderTop: "2px solid transparent",
@@ -611,7 +611,7 @@ export default function SettingsPage() {
                 setTeamError(null)
               }}
               style={{
-                padding: "16px 0",
+                padding: "12px 0",
                 fontSize: 14,
                 fontWeight: 600,
                 borderTop: "2px solid transparent",
@@ -644,7 +644,7 @@ export default function SettingsPage() {
                 setDeletingType(null)
               }}
               style={{
-                padding: "16px 0",
+                padding: "12px 0",
                 fontSize: 14,
                 fontWeight: 600,
                 borderTop: "2px solid transparent",
@@ -672,18 +672,18 @@ export default function SettingsPage() {
           </div>
 
           {/* Content */}
-          <div style={{ padding: "32px" }}>
+          <div style={{ padding: "20px 24px" }}>
             {activeTab === "account" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 <div>
-                  <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#64748b", margin: "0 0 12px" }}>
+                  <p style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#475569", margin: "0 0 8px" }}>
                     Email Address
                   </p>
                   <div style={{
-                    borderRadius: 14, border: "1.5px solid #e2e8f0",
-                    backgroundColor: "#f8fafc", padding: "16px 20px",
+                    borderRadius: 10, border: "1.5px solid #e2e8f0",
+                    backgroundColor: "#f8fafc", padding: "10px 14px",
                   }}>
-                    <p style={{ fontSize: 14, color: "#0f172a", margin: 0, wordBreak: "break-all" }}>
+                    <p style={{ fontSize: 15, color: "#0f172a", margin: 0, wordBreak: "break-all" }}>
                       {userEmail || "Not available"}
                     </p>
                   </div>
@@ -691,26 +691,26 @@ export default function SettingsPage() {
 
                 <div
                   style={{
-                    borderRadius: 14,
+                    borderRadius: 10,
                     border: "1.5px solid #e2e8f0",
                     backgroundColor: "#ffffff",
-                    padding: "18px 20px",
+                    padding: "14px 16px",
                   }}
                 >
                   <p
                     style={{
-                      fontSize: 11,
+                      fontSize: 13,
                       fontWeight: 700,
                       textTransform: "uppercase",
-                      letterSpacing: "0.1em",
-                      color: "#64748b",
-                      margin: "0 0 10px",
+                      letterSpacing: "0.08em",
+                      color: "#475569",
+                      margin: "0 0 6px",
                     }}
                   >
                     Brand Voice
                   </p>
-                  <p style={{ fontSize: 13, color: "#334155", margin: "0 0 14px" }}>
-                    Choose the default tone for generated replies. This applies to manual and auto-generated AI drafts.
+                  <p style={{ fontSize: 14, color: "#334155", margin: "0 0 10px" }}>
+                    Choose the default tone for AI-generated replies.
                   </p>
 
                   {!hasConnectedBusiness && (
@@ -729,7 +729,7 @@ export default function SettingsPage() {
                     </p>
                   )}
 
-                  <div style={{ display: "grid", gap: 10 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
                     {REPLY_TONE_VALUES.map((toneOption) => {
                       const selected = replyTone === toneOption
                       return (
@@ -737,12 +737,12 @@ export default function SettingsPage() {
                           key={toneOption}
                           style={{
                             display: "flex",
-                            alignItems: "flex-start",
-                            gap: 10,
+                            alignItems: "center",
+                            gap: 8,
                             border: selected ? "1.5px solid #2563eb" : "1.5px solid #e2e8f0",
                             backgroundColor: selected ? "#eff6ff" : "#f8fafc",
-                            borderRadius: 12,
-                            padding: "10px 12px",
+                            borderRadius: 8,
+                            padding: "8px 10px",
                             cursor: hasConnectedBusiness ? "pointer" : "not-allowed",
                             opacity: hasConnectedBusiness ? 1 : 0.65,
                           }}
@@ -754,13 +754,13 @@ export default function SettingsPage() {
                             checked={selected}
                             disabled={!hasConnectedBusiness || toneLoading || toneSaving}
                             onChange={() => setReplyTone(toneOption)}
-                            style={{ marginTop: 2 }}
+                            style={{ marginTop: 0 }}
                           />
                           <span>
-                            <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                            <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#0f172a" }}>
                               {REPLY_TONE_LABELS[toneOption]}
                             </span>
-                            <span style={{ display: "block", fontSize: 12, color: "#64748b", marginTop: 3 }}>
+                            <span style={{ display: "block", fontSize: 13, color: "#475569", marginTop: 1 }}>
                               {REPLY_TONE_DESCRIPTIONS[toneOption]}
                             </span>
                           </span>
@@ -795,15 +795,15 @@ export default function SettingsPage() {
                 </div>
 
                 <div style={{
-                  borderRadius: 14,
+                  borderRadius: 10,
                   border: "1.5px solid #dbeafe",
                   backgroundColor: "#eff6ff",
-                  padding: "18px 20px",
+                  padding: "14px 16px",
                 }}>
-                  <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#1d4ed8", margin: "0 0 10px" }}>
+                  <p style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#1d4ed8", margin: "0 0 6px" }}>
                     Need Help?
                   </p>
-                  <p style={{ fontSize: 13, color: "#1e3a8a", margin: "0 0 14px" }}>
+                  <p style={{ fontSize: 14, color: "#1e3a8a", margin: "0 0 10px" }}>
                     Reach our team for account, billing, or integration support.
                   </p>
                   <Link
@@ -825,26 +825,26 @@ export default function SettingsPage() {
 
                 <div
                   style={{
-                    borderRadius: 14,
+                    borderRadius: 10,
                     border: "1.5px solid #e2e8f0",
                     backgroundColor: "#ffffff",
-                    padding: "18px 20px",
+                    padding: "14px 16px",
                   }}
                 >
                   <p
                     style={{
-                      fontSize: 11,
+                      fontSize: 13,
                       fontWeight: 700,
                       textTransform: "uppercase",
-                      letterSpacing: "0.1em",
-                      color: "#64748b",
-                      margin: "0 0 10px",
+                      letterSpacing: "0.08em",
+                      color: "#475569",
+                      margin: "0 0 6px",
                     }}
                   >
                     Data Portability
                   </p>
-                  <p style={{ fontSize: 13, color: "#334155", margin: "0 0 14px" }}>
-                    Download a JSON file containing all your account data, businesses, reviews, replies, and analytics. This is your right under GDPR Article 20.
+                  <p style={{ fontSize: 14, color: "#334155", margin: "0 0 10px" }}>
+                    Download all your account data as JSON (GDPR Article 20).
                   </p>
                   <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                     <button
@@ -880,26 +880,26 @@ export default function SettingsPage() {
                 {showTestEmailControls && (
                   <div
                     style={{
-                      borderRadius: 14,
+                      borderRadius: 10,
                       border: "1.5px solid #e2e8f0",
                       backgroundColor: "#ffffff",
-                      padding: "18px 20px",
+                      padding: "14px 16px",
                     }}
                   >
                     <p
                       style={{
-                        fontSize: 11,
+                        fontSize: 13,
                         fontWeight: 700,
                         textTransform: "uppercase",
-                        letterSpacing: "0.1em",
-                        color: "#64748b",
-                        margin: "0 0 10px",
+                        letterSpacing: "0.08em",
+                        color: "#475569",
+                        margin: "0 0 6px",
                       }}
                     >
                       Email Testing
                     </p>
-                    <p style={{ fontSize: 13, color: "#334155", margin: "0 0 14px" }}>
-                      Send yourself a sample negative review notification email. This works in local and preview environments, and is blocked in production.
+                    <p style={{ fontSize: 14, color: "#334155", margin: "0 0 10px" }}>
+                      Send yourself a sample negative review notification email. Blocked in production.
                     </p>
                     <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                       <button
@@ -936,34 +936,34 @@ export default function SettingsPage() {
             )}
 
             {activeTab === "team" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 <div
                   style={{
-                    borderRadius: 14,
+                    borderRadius: 10,
                     border: "1.5px solid #ccfbf1",
                     backgroundColor: "#f0fdfa",
-                    padding: "18px 20px",
+                    padding: "14px 16px",
                   }}
                 >
-                  <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#0f766e", margin: "0 0 10px" }}>
+                  <p style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#0f766e", margin: "0 0 6px" }}>
                     Team access
                   </p>
-                  <p style={{ fontSize: 13, color: "#115e59", margin: 0 }}>
+                  <p style={{ fontSize: 14, color: "#115e59", margin: 0 }}>
                     Team members can only be added for existing accounts right now. Ask a teammate to sign up first, then add them here by email.
                   </p>
                 </div>
 
                 <div
                   style={{
-                    borderRadius: 14,
+                    borderRadius: 10,
                     border: "1.5px solid #e2e8f0",
                     backgroundColor: "#ffffff",
-                    padding: "18px 20px",
+                    padding: "14px 16px",
                   }}
                 >
                   <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end" }}>
-                    <label style={{ display: "grid", gap: 8, minWidth: 260, flex: "1 1 260px" }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#64748b" }}>
+                    <label style={{ display: "grid", gap: 6, minWidth: 260, flex: "1 1 260px" }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#475569" }}>
                         Business
                       </span>
                       <select
@@ -1028,13 +1028,13 @@ export default function SettingsPage() {
                 {canManageTeam && selectedTeamBusinessId && (
                   <div
                     style={{
-                      borderRadius: 14,
+                      borderRadius: 10,
                       border: "1.5px solid #e2e8f0",
                       backgroundColor: "#ffffff",
-                      padding: "18px 20px",
+                      padding: "14px 16px",
                     }}
                   >
-                    <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#64748b", margin: "0 0 10px" }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#475569", margin: "0 0 8px" }}>
                       Add member
                     </p>
                     <div style={{ display: "grid", gap: 12, gridTemplateColumns: "minmax(0, 1.4fr) minmax(160px, 0.7fr) auto" }}>
@@ -1096,18 +1096,18 @@ export default function SettingsPage() {
 
                 <div
                   style={{
-                    borderRadius: 14,
+                    borderRadius: 10,
                     border: "1.5px solid #e2e8f0",
                     backgroundColor: "#ffffff",
-                    padding: "18px 20px",
+                    padding: "14px 16px",
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
                     <div>
-                      <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#64748b", margin: "0 0 6px" }}>
+                      <p style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#475569", margin: "0 0 4px" }}>
                         Members
                       </p>
-                      <p style={{ margin: 0, fontSize: 13, color: "#334155" }}>
+                      <p style={{ margin: 0, fontSize: 14, color: "#334155" }}>
                         {teamLoading ? "Loading team..." : `${teamMembers.length} active member${teamMembers.length === 1 ? "" : "s"}`}
                       </p>
                     </div>
@@ -1230,16 +1230,16 @@ export default function SettingsPage() {
             )}
 
             {activeTab === "danger" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 {/* Delete Data Section */}
                 <div style={{
-                  borderRadius: 14, border: "1.5px solid #fed7aa",
-                  backgroundColor: "#fffbeb", padding: "20px 24px",
+                  borderRadius: 10, border: "1.5px solid #fed7aa",
+                  backgroundColor: "#fffbeb", padding: "14px 16px",
                 }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 700, color: "#92400e", margin: "0 0 8px" }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: "#92400e", margin: "0 0 6px" }}>
                     Delete All Data
                   </h3>
-                  <p style={{ fontSize: 13, color: "#b45309", margin: "0 0 16px" }}>
+                  <p style={{ fontSize: 14, color: "#b45309", margin: "0 0 12px" }}>
                     This will permanently delete all your businesses, reviews, integrations, and replies. Your account will remain active.
                   </p>
 
@@ -1398,13 +1398,13 @@ export default function SettingsPage() {
 
                 {/* Delete Account Section */}
                 <div style={{
-                  borderRadius: 14, border: "1.5px solid #fecaca",
-                  backgroundColor: "#fef2f2", padding: "20px 24px",
+                  borderRadius: 10, border: "1.5px solid #fecaca",
+                  backgroundColor: "#fef2f2", padding: "14px 16px",
                 }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 700, color: "#991b1b", margin: "0 0 8px" }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: "#991b1b", margin: "0 0 6px" }}>
                     Delete Account
                   </h3>
-                  <p style={{ fontSize: 13, color: "#dc2626", margin: "0 0 16px" }}>
+                  <p style={{ fontSize: 14, color: "#dc2626", margin: "0 0 12px" }}>
                     This will permanently delete your account and all associated data. This action cannot be undone.
                   </p>
 

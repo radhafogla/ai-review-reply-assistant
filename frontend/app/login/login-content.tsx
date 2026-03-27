@@ -13,6 +13,7 @@ export default function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const showSessionExpiredNotice = searchParams.get("reason") === "session-expired"
+  const showVerifiedNotice = searchParams.get("verified") === "true"
   const mode: AuthMode = searchParams.get("mode") === "signup" ? "signup" : "login"
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
@@ -72,6 +73,10 @@ export default function LoginContent() {
   const getLoginErrorMessage = (message: string) => {
     if (/invalid login credentials/i.test(message)) {
       return "No account matched that email and password. Sign up first or continue with Google."
+    }
+
+    if (/email not confirmed/i.test(message)) {
+      return "Please verify your email before signing in. Check your inbox for the verification link."
     }
 
     return message
@@ -179,30 +184,8 @@ export default function LoginContent() {
       return
     }
 
-    const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    })
-
-    if (loginError) {
-      setIsSubmitting(false)
-      setAuthError("Account created, but auto sign-in failed. Please sign in with your new password.")
-      return
-    }
-
-    if (loginData.session?.access_token) {
-      try {
-        await ensureUserRecord(loginData.session.access_token)
-      } catch (ensureErr) {
-        setIsSubmitting(false)
-        setAuthError(ensureErr instanceof Error ? ensureErr.message : "Failed to initialize account.")
-        return
-      }
-    }
-
     setIsSubmitting(false)
-    const redirectPath = await determineRedirect(loginData.user?.id || "")
-    router.push(redirectPath)
+    router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`)
   }
 
   return (
@@ -239,6 +222,12 @@ export default function LoginContent() {
         {showSessionExpiredNotice && (
           <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
             Your session expired. Please sign in again.
+          </div>
+        )}
+
+        {showVerifiedNotice && (
+          <div className="mb-4 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">
+            Email verified! You can now sign in.
           </div>
         )}
 
