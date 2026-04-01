@@ -64,11 +64,11 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, FeatureMap> = {
   free: {
     analytics: true,
     negativeReviewAlerts: true,
-    advancedAnalytics: false,
+    advancedAnalytics: true,
     aiGeneration: true,
-    bulkActions: false,
-    multiBusiness: false,
-    premiumAutoReply: false,
+    bulkActions: true,
+    multiBusiness: true,
+    premiumAutoReply: true,
   },
   basic: {
     analytics: true,
@@ -92,8 +92,8 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, FeatureMap> = {
 
 export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
   free: {
-    monthlyAiGenerations: 100,
-    connectedBusinesses: 1,
+    monthlyAiGenerations: 5000,
+    connectedBusinesses: 20,
   },
   basic: {
     monthlyAiGenerations: 1000,

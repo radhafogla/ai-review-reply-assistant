@@ -44,7 +44,7 @@ export default function Navbar() {
     router.prefetch("/dashboard")
     router.prefetch("/dashboard/analytics")
     router.prefetch("/connect-business")
-    router.prefetch("/subscriptions")
+    // router.prefetch("/subscriptions") // hidden for now
   }, [isAuthenticated, router])
 
   const handleLogout = async () => {
@@ -233,6 +233,7 @@ export default function Navbar() {
                 Connect Business
               </Link>
 
+              {/* Subscriptions link hidden for now — uncomment to restore
               <Link
                 href="/subscriptions"
                 className={getNavLinkClass(pathname === "/subscriptions")}
@@ -252,6 +253,8 @@ export default function Navbar() {
               >
                 Subscriptions
               </Link>
+              */}
+
             </>
           )}
         </div>

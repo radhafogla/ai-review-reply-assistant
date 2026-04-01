@@ -28,6 +28,7 @@ export default function ReviewList({
   const [isNeedsAttentionOpen, setIsNeedsAttentionOpen] = useState(true)
   const [isBacklogOpen, setIsBacklogOpen] = useState(false)
   const [isDeletedOpen, setIsDeletedOpen] = useState(false)
+  const [isDismissedOpen, setIsDismissedOpen] = useState(false)
   const [isPostedOpen, setIsPostedOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
@@ -121,6 +122,10 @@ export default function ReviewList({
     return sortedReviews.filter((review) => review.latest_reply?.status === "deleted")
   }, [sortedReviews])
 
+  const dismissed = useMemo(() => {
+    return sortedReviews.filter((review) => review.latest_reply?.status === "dismissed")
+  }, [sortedReviews])
+
   const posted = useMemo(() => {
     return sortedReviews.filter((review) => review.latest_reply?.status === "posted")
   }, [sortedReviews])
@@ -143,7 +148,7 @@ export default function ReviewList({
   // auto-expand newly arriving cards
   useEffect(() => {
     setExpandedIds((prev) => {
-      const newIds = [...needsAttention, ...backlog, ...deletedReplies, ...posted]
+      const newIds = [...needsAttention, ...backlog, ...deletedReplies, ...dismissed, ...posted]
         .filter((r) => !prev.has(r.id))
         .map((r) => r.id)
       if (newIds.length === 0) return prev
@@ -151,7 +156,7 @@ export default function ReviewList({
       newIds.forEach((id) => next.add(id))
       return next
     })
-  }, [needsAttention, backlog, deletedReplies, posted])
+  }, [needsAttention, backlog, deletedReplies, dismissed, posted])
 
   function handleMarkedPosted(reviewId: string, replyText: string, source: "ai" | "user" | "system") {
     setLocalReviews((prev) =>
@@ -208,6 +213,53 @@ export default function ReviewList({
   }
 
   const memoizedHandleMarkedDeleted = useCallback(handleMarkedDeleted, [])
+
+  function handleMarkedDismissed(reviewId: string) {
+    setLocalReviews((prev) =>
+      prev.map((review) => {
+        if (review.id !== reviewId) return review
+        const latestReplyId = review.latest_reply?.id ?? review.latest_reply_id ?? `${reviewId}-local-reply`
+        return {
+          ...review,
+          latest_reply_id: latestReplyId,
+          latest_reply: {
+            id: latestReplyId,
+            review_id: review.id,
+            reply_text: review.latest_reply?.reply_text ?? "",
+            source: review.latest_reply?.source ?? "system",
+            status: "dismissed",
+            created_at: new Date().toISOString(),
+          },
+        }
+      }),
+    )
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      next.delete(reviewId)
+      return next
+    })
+  }
+
+  const memoizedHandleMarkedDismissed = useCallback(handleMarkedDismissed, [])
+
+  function handleMarkedUndismissed(reviewId: string) {
+    setLocalReviews((prev) =>
+      prev.map((review) => {
+        if (review.id !== reviewId) return review
+        // Keep the reply but restore status to draft so the card re-enters Needs Attention
+        if (!review.latest_reply) return review
+        return {
+          ...review,
+          latest_reply: {
+            ...review.latest_reply,
+            status: "draft",
+          },
+        }
+      }),
+    )
+  }
+
+  const memoizedHandleMarkedUndismissed = useCallback(handleMarkedUndismissed, [])
 
   function handleReplyChanged(reviewId: string, replyText: string, status: "draft" | "posted" | "deleted") {
     console.log("handleReplyChanged called:", { reviewId, replyText, status })
@@ -310,6 +362,22 @@ export default function ReviewList({
     setExpandedIds((prev) => {
       const next = new Set(prev)
       deletedReplies.forEach((r) => next.delete(r.id))
+      return next
+    })
+  }
+
+  function expandAllDismissed() {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      dismissed.forEach((r) => next.add(r.id))
+      return next
+    })
+  }
+
+  function collapseAllDismissed() {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      dismissed.forEach((r) => next.delete(r.id))
       return next
     })
   }
@@ -487,6 +555,7 @@ export default function ReviewList({
             onToggleCheck={memoizedToggleSelected}
             onToggleExpand={memoizedToggleExpand}
             onMarkedPosted={memoizedHandleMarkedPosted}
+            onMarkedDismissed={memoizedHandleMarkedDismissed}
             onReplyChanged={memoizedHandleReplyChanged}
           />
         ))}
@@ -549,6 +618,38 @@ export default function ReviewList({
             isExpanded={expandedIds.has(review.id)}
             onToggleExpand={memoizedToggleExpand}
             onMarkedPosted={memoizedHandleMarkedPosted}
+            onReplyChanged={memoizedHandleReplyChanged}
+          />
+        ))}
+      </div>
+    )
+  }
+
+  function renderDismissed() {
+    if (dismissed.length === 0) {
+      return (
+        <div style={{
+          borderRadius: 12, border: "1.5px dashed #94a3b8",
+          backgroundColor: "#f8fafc", padding: 32,
+          textAlign: "center", fontSize: 14, color: "#475569",
+        }}>
+          No dismissed reviews.
+        </div>
+      )
+    }
+
+    return (
+      <div className="flex flex-col gap-3">
+        {dismissed.map((review) => (
+          <ReviewCard
+            key={review.id}
+            review={review}
+            mode="dismissed"
+            canReplyActions={canReplyActions}
+            isExpanded={expandedIds.has(review.id)}
+            onToggleExpand={memoizedToggleExpand}
+            onMarkedPosted={memoizedHandleMarkedPosted}
+            onMarkedUndismissed={memoizedHandleMarkedUndismissed}
             onReplyChanged={memoizedHandleReplyChanged}
           />
         ))}
@@ -864,6 +965,69 @@ export default function ReviewList({
           </div>
 
           {isBacklogOpen && renderBacklog()}
+        </section>
+
+        {/* Dismissed section */}
+        <section style={{ borderTop: "2px solid #f1f5f9", paddingTop: 32 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+            <button
+              type="button"
+              onClick={() => setIsDismissedOpen((prev) => !prev)}
+              style={{
+                flex: 1, display: "flex", alignItems: "center",
+                justifyContent: "space-between", padding: "12px 16px",
+                borderRadius: 12, cursor: "pointer", textAlign: "left",
+                backgroundColor: "#f8fafc", border: "2px solid #94a3b8",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                  backgroundColor: "#64748b", display: "flex",
+                  alignItems: "center", justifyContent: "center",
+                  fontSize: 16, fontWeight: 700, color: "#ffffff",
+                }}>
+                  –
+                </div>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#334155" }}>
+                  Dismissed ({dismissed.length})
+                </span>
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>
+                {isDismissedOpen ? "▼ Hide" : "▶ Show"}
+              </span>
+            </button>
+
+            {isDismissedOpen && dismissed.length > 0 && (
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                <button
+                  type="button"
+                  onClick={expandAllDismissed}
+                  style={{
+                    padding: "7px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
+                    cursor: "pointer", backgroundColor: "#ffffff",
+                    border: "1px solid #94a3b8", color: "#334155", whiteSpace: "nowrap",
+                  }}
+                >
+                  Expand all
+                </button>
+                <button
+                  type="button"
+                  onClick={collapseAllDismissed}
+                  style={{
+                    padding: "7px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
+                    cursor: "pointer", backgroundColor: "#ffffff",
+                    border: "1px solid #94a3b8", color: "#334155", whiteSpace: "nowrap",
+                  }}
+                >
+                  Collapse all
+                </button>
+              </div>
+            )}
+          </div>
+
+          {isDismissedOpen && renderDismissed()}
         </section>
 
         {/* Deleted section */}

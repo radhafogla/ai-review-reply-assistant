@@ -149,7 +149,7 @@ CREATE TABLE IF NOT EXISTS "public"."review_replies" (
     "tone_effective" "text",
     "tone_adapted" boolean DEFAULT false,
     CONSTRAINT "review_replies_source_check" CHECK (("source" = ANY (ARRAY['ai'::"text", 'user'::"text", 'system'::"text"]))),
-    CONSTRAINT "review_replies_status_check" CHECK (("status" = ANY (ARRAY['draft'::"text", 'approved'::"text", 'posted'::"text", 'failed'::"text", 'deleted'::"text"])))
+    CONSTRAINT "review_replies_status_check" CHECK (("status" = ANY (ARRAY['draft'::"text", 'approved'::"text", 'posted'::"text", 'failed'::"text", 'deleted'::"text", 'dismissed'::"text"])))
 );
 
 
