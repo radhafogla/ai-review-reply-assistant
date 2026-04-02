@@ -91,6 +91,7 @@ export async function POST(req: NextRequest) {
 
   const result = await sendNegativeReviewNotificationEmail({
     toEmail: user.email,
+    userId: user.id,
     businessName,
     reviews,
   })

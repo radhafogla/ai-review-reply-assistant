@@ -66,6 +66,11 @@ export default function SettingsPage() {
   const [inviteRole, setInviteRole] = useState<BusinessMemberRole>("viewer")
   const [memberRoleDrafts, setMemberRoleDrafts] = useState<Record<string, BusinessMemberRole>>({})
   const [memberActionUserId, setMemberActionUserId] = useState<string | null>(null)
+  const [emailNegativeAlerts, setEmailNegativeAlerts] = useState(true)
+  const [emailWeeklyDigest, setEmailWeeklyDigest] = useState(true)
+  const [emailPrefLoading, setEmailPrefLoading] = useState(false)
+  const [emailPrefSaving, setEmailPrefSaving] = useState(false)
+  const [emailPrefMessage, setEmailPrefMessage] = useState<string | null>(null)
 
   const getAccessToken = useCallback(async () => {
     const {
@@ -398,8 +403,56 @@ export default function SettingsPage() {
     }
   }
 
-  async function exportMyData() {
-    setExportLoading(true)
+  const loadEmailPreferences = useCallback(async () => {
+    setEmailPrefLoading(true)
+    try {
+      const token = await getAccessToken()
+      if (!token) return
+      const res = await fetch("/api/update-email-preferences", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) return
+      const data = await res.json() as { email_negative_review_alerts?: boolean; email_weekly_digest?: boolean }
+      setEmailNegativeAlerts(data.email_negative_review_alerts ?? true)
+      setEmailWeeklyDigest(data.email_weekly_digest ?? true)
+    } catch (err) {
+      console.error("Load email preferences error:", err)
+    } finally {
+      setEmailPrefLoading(false)
+    }
+  }, [getAccessToken])
+
+  async function saveEmailPreferences() {
+    setEmailPrefSaving(true)
+    setEmailPrefMessage(null)
+    try {
+      const token = await getAccessToken()
+      if (!token) {
+        setEmailPrefMessage("Session expired. Please sign in again.")
+        return
+      }
+      const res = await fetch("/api/update-email-preferences", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email_negative_review_alerts: emailNegativeAlerts,
+          email_weekly_digest: emailWeeklyDigest,
+        }),
+      })
+      if (!res.ok) {
+        setEmailPrefMessage("Failed to save. Please try again.")
+        return
+      }
+      setEmailPrefMessage("Preferences saved.")
+    } catch (err) {
+      console.error("Save email preferences error:", err)
+      setEmailPrefMessage("Failed to save. Please try again.")
+    } finally {
+      setEmailPrefSaving(false)
+    }
+  }
+
+  async function exportMyData() {    setExportLoading(true)
     setExportMessage(null)
 
     try {
@@ -449,13 +502,14 @@ export default function SettingsPage() {
         setIsAuthenticated(true)
         await loadReplyTone()
         await loadTeamMembers()
+        await loadEmailPreferences()
       } else {
         router.push("/login")
       }
     }
 
     loadSession()
-  }, [router, loadReplyTone, loadTeamMembers])
+  }, [router, loadReplyTone, loadTeamMembers, loadEmailPreferences])
 
   const handleDeleteData = async () => {
     setIsDeleting(true)
@@ -821,6 +875,91 @@ export default function SettingsPage() {
                   >
                     Contact Us
                   </Link>
+                </div>
+
+                <div
+                  style={{
+                    borderRadius: 10,
+                    border: "1.5px solid #e2e8f0",
+                    backgroundColor: "#ffffff",
+                    padding: "14px 16px",
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      color: "#475569",
+                      margin: "0 0 6px",
+                    }}
+                  >
+                    Email Notifications
+                  </p>
+                  <p style={{ fontSize: 14, color: "#334155", margin: "0 0 14px" }}>
+                    Choose which emails you receive from Revidew.
+                  </p>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
+                    {(
+                      [
+                        { key: "negative_alerts" as const, label: "Negative review alerts", desc: "Get notified by email when a new 1–2 star review comes in.", value: emailNegativeAlerts, set: setEmailNegativeAlerts },
+                        { key: "weekly_digest" as const, label: "Weekly digest", desc: "A weekly summary of reviews waiting for a reply.", value: emailWeeklyDigest, set: setEmailWeeklyDigest },
+                      ] as const
+                    ).map(({ key, label, desc, value, set }) => (
+                      <label
+                        key={key}
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 10,
+                          padding: "10px 12px",
+                          borderRadius: 8,
+                          border: `1.5px solid ${value ? "#bfdbfe" : "#e2e8f0"}`,
+                          backgroundColor: value ? "#eff6ff" : "#f8fafc",
+                          cursor: emailPrefLoading ? "not-allowed" : "pointer",
+                          opacity: emailPrefLoading ? 0.65 : 1,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={value}
+                          disabled={emailPrefLoading || emailPrefSaving}
+                          onChange={(e) => set(e.target.checked)}
+                          style={{ marginTop: 2, flexShrink: 0 }}
+                        />
+                        <span>
+                          <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{label}</span>
+                          <span style={{ display: "block", fontSize: 13, color: "#475569", marginTop: 2 }}>{desc}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <button
+                      onClick={saveEmailPreferences}
+                      disabled={emailPrefLoading || emailPrefSaving}
+                      style={{
+                        padding: "8px 14px",
+                        borderRadius: 10,
+                        backgroundColor: emailPrefLoading || emailPrefSaving ? "#cbd5e1" : "#2563eb",
+                        color: "#ffffff",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        border: "none",
+                        cursor: emailPrefLoading || emailPrefSaving ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      {emailPrefSaving ? "Saving..." : "Save preferences"}
+                    </button>
+                    {emailPrefMessage && (
+                      <p style={{ margin: 0, fontSize: 12, color: emailPrefMessage.includes("saved") ? "#166534" : "#b45309" }}>
+                        {emailPrefMessage}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <div
