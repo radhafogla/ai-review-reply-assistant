@@ -9,7 +9,7 @@ export interface Review {
     review_time?: string;
     needs_ai_reply?: boolean;
     is_actionable?: boolean;
-    latest_reply_id?: string;
+    latest_reply_id?: string | null;
     latest_reply?: ReviewReply
     ai_reply_attempts?: number
 }
@@ -22,7 +22,7 @@ export interface ReviewReply {
   tone_effective?: string | null
   tone_adapted?: boolean | null
   source: "ai" | "user" | "system"
-  status: "draft" | "approved" | "posted" | "failed" | "deleted"
+  status: "draft" | "approved" | "posted" | "failed" | "deleted" | "dismissed"
   created_at: string
 }
 

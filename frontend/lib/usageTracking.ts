@@ -10,6 +10,7 @@ export type UsageEventType =
   | "limit_warning_shown"
   | "negative_review_notification_failed"
   | "negative_review_notification_sent"
+  | "weekly_digest_sent"
   | "reply_deleted"
   | "reply_generated"
   | "reply_posted"

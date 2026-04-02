@@ -569,7 +569,7 @@ export default function AnalyticsPage() {
             <h1 style={{ fontSize: 30, fontWeight: 800, color: "#ffffff", margin: "8px 0 0", letterSpacing: "-0.4px" }}>
               Review insights
             </h1>
-            <p style={{ fontSize: 14, color: "#475569", marginTop: 6, maxWidth: 620 }}>
+            <p style={{ fontSize: 15, color: "#cbd5e1", marginTop: 6, marginBottom: 0 }}>
               Snapshot of your review activity: total reviews, posted replies, average rating, and subscription status.
             </p>
           </div>

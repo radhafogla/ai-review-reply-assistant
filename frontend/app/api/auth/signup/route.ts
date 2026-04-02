@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabaseServerClient"
 import { createRequestId, logApiError, logApiRequest } from "@/lib/apiLogger"
+import { Resend } from "resend"
 
 type SignupPayload = {
   fullName?: string
@@ -68,13 +69,18 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { data: created, error: createAuthError } = await supabase.auth.admin.createUser({
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+
+    const { data: linkData, error: createAuthError } = await supabase.auth.admin.generateLink({
+      type: "signup",
       email,
       password,
-      email_confirm: true,
-      user_metadata: {
-        name: fullName,
-        full_name: fullName,
+      options: {
+        data: {
+          name: fullName,
+          full_name: fullName,
+        },
+        redirectTo: `${siteUrl}/login?verified=true`,
       },
     })
 
@@ -87,9 +93,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: createAuthError.message }, { status: 400 })
     }
 
-    const authUser = created.user
+    const authUser = linkData.user
     if (!authUser) {
       return NextResponse.json({ error: "Failed to create account." }, { status: 500 })
+    }
+
+    const actionLink = linkData.properties?.action_link
+    if (actionLink && process.env.RESEND_API_KEY) {
+      const resend = new Resend(process.env.RESEND_API_KEY)
+      await resend.emails.send({
+        from: "Revidew <noreply@mail.revidew.com>",
+        to: email,
+        subject: "Verify your email - Revidew",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 0;">
+            <h2 style="color: #0f172a; margin-bottom: 8px;">Welcome to Revidew</h2>
+            <p style="color: #475569; font-size: 15px; line-height: 1.6;">
+              Hi ${fullName}, thanks for signing up! Please confirm your email address to get started.
+            </p>
+            <div style="margin: 28px 0;">
+              <a href="${actionLink}" style="display: inline-block; background: #0f172a; color: #fff; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
+                Verify my email
+              </a>
+            </div>
+            <p style="color: #94a3b8; font-size: 13px;">If you didn't create this account, you can ignore this email.</p>
+          </div>
+        `,
+      })
     }
 
     const trialEnd = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
@@ -133,7 +163,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ requiresVerification: true })
   } catch (err) {
     logApiError({
       requestId,

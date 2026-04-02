@@ -9,7 +9,7 @@ const MAX_GENERATIONS_PER_REVIEW = 5
 
 interface Props {
   review: ReviewWithAnalysis
-  mode: "needs-attention" | "posted" | "deleted"
+  mode: "needs-attention" | "posted" | "deleted" | "dismissed"
   canReplyActions?: boolean
   showCheckbox?: boolean
   isChecked?: boolean
@@ -18,6 +18,8 @@ interface Props {
   onToggleExpand?: (reviewId: string) => void
   onMarkedPosted: (reviewId: string, replyText: string, source: "ai" | "user" | "system") => void
   onMarkedDeleted?: (reviewId: string, replyText: string) => void
+  onMarkedDismissed?: (reviewId: string) => void
+  onMarkedUndismissed?: (reviewId: string) => void
   onReplyChanged?: (reviewId: string, replyText: string, status: "draft" | "posted" | "deleted") => void
 }
 
@@ -78,6 +80,8 @@ export default function ReviewCard({
   onToggleExpand,
   onMarkedPosted,
   onMarkedDeleted,
+  onMarkedDismissed,
+  onMarkedUndismissed,
   onReplyChanged,
 }: Props) {
   const [latestTone, setLatestTone] = useState<{ base: ReplyTone; effective: ReplyTone; adapted: boolean } | null>(null)
@@ -88,6 +92,7 @@ export default function ReviewCard({
   const [saving, setSaving] = useState(false)
   const [posting, setPosting] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [dismissing, setDismissing] = useState(false)
   const [sessionExpiredRedirecting, setSessionExpiredRedirecting] = useState(false)
   const [currentAttempts, setCurrentAttempts] = useState(review.ai_reply_attempts ?? 0)
 
@@ -338,8 +343,53 @@ export default function ReviewCard({
     }
   }
 
+  async function dismissReview() {
+    const accessToken = await getAccessToken()
+    if (!accessToken) return
+
+    setDismissing(true)
+    try {
+      const res = await fetch("/api/dismiss-review", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ reviewId: review.id }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        showActionMessage("error", (body as { error?: string }).error ?? "Failed to dismiss")
+        return
+      }
+      onMarkedDismissed?.(review.id)
+    } finally {
+      setDismissing(false)
+    }
+  }
+
+  async function undismissReview() {
+    const accessToken = await getAccessToken()
+    if (!accessToken) return
+
+    setDismissing(true)
+    try {
+      const res = await fetch("/api/dismiss-review", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ reviewId: review.id, undismiss: true }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        showActionMessage("error", (body as { error?: string }).error ?? "Failed to restore")
+        return
+      }
+      onMarkedUndismissed?.(review.id)
+    } finally {
+      setDismissing(false)
+    }
+  }
+
   const isNA = mode === "needs-attention"
   const isDeleted = mode === "deleted"
+  const isDismissed = mode === "dismissed"
   const expanded = isExpanded ?? true
   const isDirty = replyText !== savedText
   const remainingAttempts = Math.max(0, MAX_GENERATIONS_PER_REVIEW - currentAttempts)
@@ -348,14 +398,14 @@ export default function ReviewCard({
   const postOff = !canReplyActions || posting || !replyText.trim()
   const attemptsReached = remainingAttempts === 0
 
-  const cardBackground = isDeleted ? "#fff1f2" : isNA ? "#fffbeb" : "#f0fdf4"
-  const cardBorder = isDeleted ? "#fda4af" : isNA ? "#fcd34d" : "#6ee7b7"
-  const dividerBorder = isDeleted ? "#fecdd3" : isNA ? "#fde68a" : "#a7f3d0"
-  const badgeBackground = isDeleted ? "#ffe4e6" : isNA ? "#fef3c7" : "#dcfce7"
-  const badgeBorder = isDeleted ? "#fecdd3" : isNA ? "#fde68a" : "#bbf7d0"
-  const badgeColor = isDeleted ? "#9f1239" : isNA ? "#78350f" : "#14532d"
-  const chevronColor = isDeleted ? "#e11d48" : isNA ? "#b45309" : "#059669"
-  const statusLabel = isDeleted ? "Deleted" : isNA ? "Needs attention" : "Posted"
+  const cardBackground = isDeleted ? "#fff1f2" : isDismissed ? "#f8fafc" : isNA ? "#fffbeb" : "#f0fdf4"
+  const cardBorder = isDeleted ? "#fda4af" : isDismissed ? "#cbd5e1" : isNA ? "#fcd34d" : "#6ee7b7"
+  const dividerBorder = isDeleted ? "#fecdd3" : isDismissed ? "#e2e8f0" : isNA ? "#fde68a" : "#a7f3d0"
+  const badgeBackground = isDeleted ? "#ffe4e6" : isDismissed ? "#f1f5f9" : isNA ? "#fef3c7" : "#dcfce7"
+  const badgeBorder = isDeleted ? "#fecdd3" : isDismissed ? "#cbd5e1" : isNA ? "#fde68a" : "#bbf7d0"
+  const badgeColor = isDeleted ? "#9f1239" : isDismissed ? "#475569" : isNA ? "#78350f" : "#14532d"
+  const chevronColor = isDeleted ? "#e11d48" : isDismissed ? "#64748b" : isNA ? "#b45309" : "#059669"
+  const statusLabel = isDeleted ? "Deleted" : isDismissed ? "Dismissed" : isNA ? "Needs attention" : "Posted"
   const sentimentMeta = resolveSentimentMeta(review)
 
   const persistedTone =
@@ -476,7 +526,56 @@ export default function ReviewCard({
       {expanded && (
         <div style={{ padding: "0 16px 16px", borderTop: `1px solid ${dividerBorder}` }}>
 
-          {isNA || isDeleted ? (
+          {isDismissed ? (
+            <>
+              <div style={{
+                marginTop: 10, borderRadius: 10, padding: "10px 14px",
+                fontSize: 13, lineHeight: 1.7, color: "#475569",
+                backgroundColor: "#ffffff", border: "1px solid #cbd5e1",
+              }}>
+                {replyText
+                  ? replyText
+                  : <span style={{ color: "#94a3b8", fontStyle: "italic" }}>No reply drafted yet.</span>}
+              </div>
+
+              <div style={{
+                marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8,
+                borderTop: "1px solid #e2e8f0", paddingTop: 10,
+              }}>
+                <button
+                  onClick={undismissReview}
+                  disabled={dismissing || !canReplyActions}
+                  style={{
+                    padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 700,
+                    cursor: dismissing || !canReplyActions ? "not-allowed" : "pointer",
+                    backgroundColor: dismissing || !canReplyActions ? BTN_OFF.bg : BTN_SLATE.bg,
+                    border: `1px solid ${dismissing || !canReplyActions ? BTN_OFF.border : BTN_SLATE.border}`,
+                    color: dismissing || !canReplyActions ? BTN_OFF.text : BTN_SLATE.text,
+                  }}
+                >
+                  {dismissing ? "Restoring\u2026" : "Move back to Needs Attention"}
+                </button>
+
+                {actionMessage && (
+                  <span
+                    style={{
+                      marginLeft: 4,
+                      borderRadius: 999,
+                      padding: "6px 10px",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      alignSelf: "center",
+                      backgroundColor: actionMessage.type === "success" ? "#dcfce7" : actionMessage.type === "warning" ? "#fef3c7" : "#fee2e2",
+                      border: `1px solid ${actionMessage.type === "success" ? "#86efac" : actionMessage.type === "warning" ? "#fcd34d" : "#fca5a5"}`,
+                      color: actionMessage.type === "success" ? "#14532d" : actionMessage.type === "warning" ? "#78350f" : "#991b1b",
+                    }}
+                  >
+                    {actionMessage.text}
+                  </span>
+                )}
+              </div>
+            </>
+          ) : isNA || isDeleted ? (
             <>
               {/* textarea */}
               <textarea
@@ -543,6 +642,22 @@ export default function ReviewCard({
                 >
                   {posting ? "Posting\u2026" : "Save and Post"}
                 </button>
+
+                {isNA && (
+                  <button
+                    onClick={dismissReview}
+                    disabled={dismissing || !canReplyActions}
+                    style={{
+                      padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 700,
+                      cursor: dismissing || !canReplyActions ? "not-allowed" : "pointer",
+                      backgroundColor: dismissing || !canReplyActions ? BTN_OFF.bg : "#f1f5f9",
+                      border: `1px solid ${dismissing || !canReplyActions ? BTN_OFF.border : "#94a3b8"}`,
+                      color: dismissing || !canReplyActions ? BTN_OFF.text : "#475569",
+                    }}
+                  >
+                    {dismissing ? "Dismissing\u2026" : "Dismiss"}
+                  </button>
+                )}
 
                 {displayedTone && !isDeleted && (
                   <span

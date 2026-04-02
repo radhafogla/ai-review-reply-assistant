@@ -149,7 +149,7 @@ CREATE TABLE IF NOT EXISTS "public"."review_replies" (
     "user_id" "uuid",
     "updated_at" timestamp with time zone DEFAULT "now"(),
     CONSTRAINT "review_replies_source_check" CHECK (("source" = ANY (ARRAY['ai'::"text", 'user'::"text", 'system'::"text"]))),
-    CONSTRAINT "review_replies_status_check" CHECK (("status" = ANY (ARRAY['draft'::"text", 'approved'::"text", 'posted'::"text", 'failed'::"text", 'deleted'::"text"])))
+    CONSTRAINT "review_replies_status_check" CHECK (("status" = ANY (ARRAY['draft'::"text", 'approved'::"text", 'posted'::"text", 'failed'::"text", 'deleted'::"text", 'dismissed'::"text"])))
 );
 
 
@@ -243,6 +243,8 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
     "premium_auto_reply_min_rating" integer DEFAULT 5 NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"(),
     "updated_at" timestamp with time zone DEFAULT "now"(),
+    "email_negative_review_alerts" boolean DEFAULT true NOT NULL,
+    "email_weekly_digest" boolean DEFAULT true NOT NULL,
     CONSTRAINT "users_premium_auto_reply_min_rating_check" CHECK ((("premium_auto_reply_min_rating" >= 1) AND ("premium_auto_reply_min_rating" <= 5)))
 );
 

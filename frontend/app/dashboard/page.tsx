@@ -301,16 +301,16 @@ export default function Dashboard() {
             }}>
               Review command center
             </p>
-            <h1 style={{ fontSize: 30, fontWeight: 800, color: "#ffffff", margin: "6px 0 0", letterSpacing: "-0.5px" }}>
+            <h1 style={{ fontSize: 30, fontWeight: 800, color: "#ffffff", margin: "8px 0 0", letterSpacing: "-0.4px" }}>
               Customer reply desk
             </h1>
-            <p style={{ fontSize: 14, color: "#94a3b8", marginTop: 5, maxWidth: 560 }}>
+            <p style={{ fontSize: 15, color: "#cbd5e1", marginTop: 6, marginBottom: 0 }}>
               Two-lane workflow — act on reviews that need attention, track what&#39;s already posted.
             </p>
           </div>
 
           {/* stats row */}
-          <div style={{ padding: "18px 24px" }}>
+          <div style={{ padding: "14px 24px" }}>
 
             {/* business selector + avg rating */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
@@ -415,72 +415,72 @@ export default function Dashboard() {
             </div>
 
             {/* stat cards */}
-            <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+            <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
 
               {/* Total */}
               <div style={{
-                borderRadius: 14, border: "1.5px solid #e2e8f0",
-                backgroundColor: "#f8fafc", padding: "14px 18px",
+                borderRadius: 10, border: "1.5px solid #e2e8f0",
+                backgroundColor: "#f8fafc", padding: "10px 14px",
               }}>
-                <p style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#64748b", margin: 0 }}>
+                <p style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#64748b", margin: 0 }}>
                   Total reviews
                 </p>
-                <p style={{ fontSize: 26, fontWeight: 800, color: "#0f172a", margin: "8px 0 0" }}>
+                <p style={{ fontSize: 26, fontWeight: 800, color: "#0f172a", margin: "4px 0 0" }}>
                   {totalReviews}
                 </p>
               </div>
 
               {/* Needs attention */}
               <div style={{
-                borderRadius: 14, border: "1.5px solid #fcd34d",
-                backgroundColor: "#fffbeb", padding: "14px 18px",
+                borderRadius: 10, border: "1.5px solid #fcd34d",
+                backgroundColor: "#fffbeb", padding: "10px 14px",
               }}>
-                <p style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#b45309", margin: 0 }}>
+                <p style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#b45309", margin: 0 }}>
                   Needs attention
                 </p>
-                <p style={{ fontSize: 26, fontWeight: 800, color: "#78350f", margin: "8px 0 0" }}>
+                <p style={{ fontSize: 26, fontWeight: 800, color: "#78350f", margin: "4px 0 0" }}>
                   {reviewsNeedingAttention}
                 </p>
               </div>
 
               <div style={{
-                borderRadius: 14, border: "1.5px solid #c4b5fd",
-                backgroundColor: "#f5f3ff", padding: "14px 18px",
+                borderRadius: 10, border: "1.5px solid #c4b5fd",
+                backgroundColor: "#f5f3ff", padding: "10px 14px",
               }}>
-                <p style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#6d28d9", margin: 0 }}>
+                <p style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#6d28d9", margin: 0 }}>
                   Historical backlog
                 </p>
-                <p style={{ fontSize: 26, fontWeight: 800, color: "#5b21b6", margin: "8px 0 0" }}>
+                <p style={{ fontSize: 26, fontWeight: 800, color: "#5b21b6", margin: "4px 0 0" }}>
                   {backlogReviews}
                 </p>
               </div>
 
               {/* Posted */}
               <div style={{
-                borderRadius: 14, border: "1.5px solid #6ee7b7",
-                backgroundColor: "#f0fdf4", padding: "14px 18px",
+                borderRadius: 10, border: "1.5px solid #6ee7b7",
+                backgroundColor: "#f0fdf4", padding: "10px 14px",
               }}>
-                <p style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#065f46", margin: 0 }}>
+                <p style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#065f46", margin: 0 }}>
                   Posted replies
                 </p>
-                <p style={{ fontSize: 26, fontWeight: 800, color: "#14532d", margin: "8px 0 0" }}>
+                <p style={{ fontSize: 26, fontWeight: 800, color: "#14532d", margin: "4px 0 0" }}>
                   {postedReviews}
                 </p>
               </div>
 
               {/* Reply coverage */}
               <div style={{
-                borderRadius: 14, border: "1.5px solid #93c5fd",
-                backgroundColor: "#eff6ff", padding: "14px 18px",
+                borderRadius: 10, border: "1.5px solid #93c5fd",
+                backgroundColor: "#eff6ff", padding: "10px 14px",
               }}>
-                <p style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#1d4ed8", margin: 0 }}>
+                <p style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#1d4ed8", margin: 0 }}>
                   Reply coverage
                 </p>
-                <p style={{ fontSize: 28, fontWeight: 800, color: "#1e3a8a", margin: "8px 0 0" }}>
+                <p style={{ fontSize: 28, fontWeight: 800, color: "#1e3a8a", margin: "4px 0 0" }}>
                   {replyCoverage}%
                 </p>
                 {/* progress bar */}
-                <div style={{ marginTop: 10, height: 6, borderRadius: 99, backgroundColor: "#bfdbfe" }}>
+                <div style={{ marginTop: 6, height: 5, borderRadius: 99, backgroundColor: "#bfdbfe" }}>
                   <div style={{
                     height: "100%", borderRadius: 99,
                     backgroundColor: "#2563eb",

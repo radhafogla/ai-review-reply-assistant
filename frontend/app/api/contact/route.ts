@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
 
   // Send admin notification email
   const adminEmailResult = await resend.emails.send({
-    from: "onboarding@resend.dev",
+    from: "Revidew <support@mail.revidew.com>",
     to: "support@revidew.com",
     subject: `Review AI Contact Form: ${subject.trim()}`,
     html: `
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
 
   // Send confirmation email to user
   // const confirmationEmailResult = await resend.emails.send({
-  //   from: "onboarding@resend.dev",
+  //   from: "Revidew <noreply@mail.revidew.com>",
   //   to: email.trim(),
   //   subject: "We received your message - ReviewAI",
   //   html: `

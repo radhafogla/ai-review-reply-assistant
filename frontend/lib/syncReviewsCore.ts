@@ -143,10 +143,12 @@ function trimReviewText(reviewText: string, maxLength = 180): string {
 
 export async function sendNegativeReviewNotificationEmail({
   toEmail,
+  userId,
   businessName,
   reviews,
 }: {
   toEmail: string
+  userId: string
   businessName: string
   reviews: NegativeReviewNotificationReview[]
 }): Promise<{ sent: boolean; error?: string }> {
@@ -154,7 +156,7 @@ export async function sendNegativeReviewNotificationEmail({
     return { sent: false, error: "RESEND_API_KEY is not configured" }
   }
 
-  const fromEmail = process.env.REVIEW_ALERT_FROM_EMAIL || "onboarding@resend.dev"
+  const fromEmail = process.env.REVIEW_ALERT_FROM_EMAIL || "Revidew <noreply@mail.revidew.com>"
 
   const reviewsHtml = reviews
     .map((review) => {
@@ -181,6 +183,7 @@ export async function sendNegativeReviewNotificationEmail({
 
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "")
   const dashboardUrl = `${siteUrl}/dashboard`
+  const unsubscribeUrl = `${siteUrl}/api/unsubscribe?uid=${encodeURIComponent(userId)}&type=negative_alerts`
 
   const result = await resend.emails.send({
     from: fromEmail,
@@ -195,7 +198,11 @@ export async function sendNegativeReviewNotificationEmail({
         </p>
         <ul style="padding-left: 18px; margin: 0 0 18px;">${reviewsHtml}</ul>
         ${siteUrl ? `<a href="${dashboardUrl}" style="display: inline-block; margin-bottom: 16px; padding: 10px 20px; background-color: #2563eb; color: #ffffff; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 8px;">Open Revidew to draft and post a response.</a>` : ""}
-        <p style="color: #64748b; font-size: 13px; margin: 0;">Open Revidew to draft and post a response.</p>
+        <p style="color: #64748b; font-size: 13px; margin: 0 0 16px;">Open Revidew to draft and post a response.</p>
+        <p style="color: #94a3b8; font-size: 12px; margin: 0; border-top: 1px solid #f1f5f9; padding-top: 16px;">
+          You're receiving this because you have a Revidew account.
+          <a href="${unsubscribeUrl}" style="color: #94a3b8;">Unsubscribe from negative review alerts</a>
+        </p>
       </div>
     `,
   })
@@ -331,12 +338,13 @@ export async function performBusinessSync(
   // Fetch user settings — includes email for negative-review notifications
   const { data: userRow } = await serviceSupabase
     .from("users")
-    .select("plan, premium_auto_reply_enabled, premium_auto_reply_min_rating, email")
+    .select("plan, premium_auto_reply_enabled, premium_auto_reply_min_rating, email, email_negative_review_alerts")
     .eq("id", userId)
     .maybeSingle()
 
   const userPlan = normalizePlan(userRow?.plan)
   const userEmail: string | null = userRow?.email ?? null
+  const negativeAlertsEnabled: boolean = userRow?.email_negative_review_alerts ?? true
   const replyTone = normalizeReplyTone(business.reply_tone)
   const autoReplyAvailable = hasFeature(userPlan, "premiumAutoReply")
   const autoReplyEnabled = autoReplyAvailable && Boolean(userRow?.premium_auto_reply_enabled)
@@ -507,11 +515,12 @@ export async function performBusinessSync(
       },
     })
 
-    if (newNegativeReviews.length > 0 && userEmail) {
+    if (newNegativeReviews.length > 0 && userEmail && negativeAlertsEnabled) {
       negativeReviewNotificationAttempted = true
 
       const notifyResult = await sendNegativeReviewNotificationEmail({
         toEmail: userEmail,
+        userId,
         businessName: business.name,
         reviews: newNegativeReviews,
       })
